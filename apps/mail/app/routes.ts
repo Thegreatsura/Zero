@@ -5,6 +5,7 @@ export default [
   route('/home', 'home/page.tsx'),
 
   route('/api/mailto-handler', 'mailto-handler.ts'),
+  route('/api/locale/:locale', 'routes/api.locale.$locale.ts'),
 
   layout('(full-width)/layout.tsx', [
     route('/about', '(full-width)/about.tsx'),
