@@ -9,6 +9,8 @@ export function useLabels() {
       staleTime: 1000 * 60 * 60, // 1 hour
     }),
   );
+
+  // Labels are already sorted by order from the server
   return labelQuery;
 }
 

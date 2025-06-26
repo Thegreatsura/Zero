@@ -17,12 +17,12 @@ import { CurvedArrow } from '@/components/icons/icons';
 import { LABEL_COLORS } from '@/lib/label-colors';
 import type { Label as LabelType } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'use-intl';
 import { useForm } from 'react-hook-form';
 import { Command } from 'lucide-react';
-import { useTranslations } from 'use-intl';
 
 interface LabelDialogProps {
   trigger?: React.ReactNode;
@@ -64,12 +64,13 @@ export function LabelDialog({
       if (editingLabel) {
         form.reset({
           name: editingLabel.name,
-          color: editingLabel.color || { backgroundColor: '#E2E2E2', textColor: '#000000' },
+          color: editingLabel.color || { backgroundColor: '', textColor: '' },
         });
       } else {
+        // Let server assign random color for new labels
         form.reset({
           name: '',
-          color: { backgroundColor: '#E2E2E2', textColor: '#000000' },
+          color: { backgroundColor: '', textColor: '' },
         });
       }
     }
@@ -85,7 +86,7 @@ export function LabelDialog({
     setDialogOpen(false);
     form.reset({
       name: '',
-      color: { backgroundColor: '#E2E2E2', textColor: '#000000' },
+      color: { backgroundColor: '', textColor: '' },
     });
   };
 
@@ -94,7 +95,9 @@ export function LabelDialog({
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogContent showOverlay={true}>
         <DialogHeader>
-          <DialogTitle>{editingLabel ? t('common.labels.editLabel') : t('common.mail.createNewLabel')}</DialogTitle>
+          <DialogTitle>
+            {editingLabel ? t('common.labels.editLabel') : t('common.mail.createNewLabel')}
+          </DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form

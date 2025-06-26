@@ -7,6 +7,7 @@ export type Label = {
   };
   type: string;
   labels?: Label[];
+  order?: number;
 };
 
 export interface User {

@@ -581,6 +581,9 @@ importers:
       mimetext:
         specifier: ^3.0.27
         version: 3.0.27
+      nanoid:
+        specifier: 5.1.5
+        version: 5.1.5
       p-retry:
         specifier: 6.2.1
         version: 6.2.1
