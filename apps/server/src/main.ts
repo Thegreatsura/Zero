@@ -177,12 +177,6 @@ export class DbRpcDO extends RpcTarget {
 class ZeroDB extends DurableObject<Env> {
   db: DB = createDb(env.HYPERDRIVE.connectionString).db;
 
-  async getLabelOrders(connectionId: string): Promise<(typeof labelOrder.$inferSelect)[]> {
-    return await this.db.query.labelOrder.findMany({
-      where: eq(labelOrder.connectionId, connectionId),
-    });
-  }
-
   async setMetaData(userId: string) {
     return new DbRpcDO(this, userId);
   }

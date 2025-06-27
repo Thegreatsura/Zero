@@ -1,12 +1,13 @@
 import { activeDriverProcedure, createRateLimiterMiddleware, router } from '../trpc';
-import { getZeroAgent, getZeroDB } from '../../lib/server-utils';
+import { getZeroAgent } from '../../lib/server-utils';
 import { Ratelimit } from '@upstash/ratelimit';
 import { labelOrder } from '../../db/schema';
-import { eq, and, sql } from 'drizzle-orm';
+import { env } from 'cloudflare:workers';
+import { eq, sql } from 'drizzle-orm';
+import { createDb } from '../../db';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
 
-// Add label colors constant
 const LABEL_COLORS = [
   { textColor: '#FFFFFF', backgroundColor: '#202020' },
   { textColor: '#D1F0D9', backgroundColor: '#12341D' },
@@ -45,15 +46,12 @@ export const labelsRouter = router({
       const agent = await getZeroAgent(activeConnection.id);
       const labels = await agent.getUserLabels();
 
-      // Get label orders and custom colors from database
-      const db = getZeroDB(ctx.activeConnection.id);
-      const labelOrders = await db.getLabelOrders(ctx.activeConnection.id);
+      const labelOrders = await agent.getLabelOrders();
 
       const orderMap = new Map(
         labelOrders.map((lo) => [lo.labelId, { order: lo.order, customColor: lo.customColor }]),
       );
 
-      // Merge labels with order and custom colors
       return labels
         .map((label) => ({
           ...label,
@@ -87,7 +85,6 @@ export const labelsRouter = router({
       const { activeConnection } = ctx;
       const agent = await getZeroAgent(activeConnection.id);
 
-      // Assign random color if no color is provided
       let labelColor = input.color;
       if (!labelColor.backgroundColor || !labelColor.textColor) {
         const randomColor = LABEL_COLORS[Math.floor(Math.random() * LABEL_COLORS.length)];
@@ -100,38 +97,43 @@ export const labelsRouter = router({
         type: 'user',
       };
 
-      // Create the label with the provider
-      const createdLabel = await agent.createLabel(label);
+      await agent.createLabel(label);
 
-      // Store the custom color in our database
-      if (createdLabel.id) {
-        // Get the next order value
-        const maxOrderResult = await ctx.db
-          .select({ maxOrder: sql<number>`COALESCE(MAX("order"), -1)` })
-          .from(labelOrder)
-          .where(eq(labelOrder.connectionId, activeConnection.id));
+      const allLabels = await agent.getUserLabels();
+      const createdLabel = allLabels.find((l) => l.name === label.name);
 
-        const nextOrder = (maxOrderResult[0]?.maxOrder ?? -1) + 1;
+      if (createdLabel?.id) {
+        const { db, conn } = createDb(env.HYPERDRIVE.connectionString);
+        try {
+          const maxOrderResult = await db
+            .select({ maxOrder: sql<number>`COALESCE(MAX("order"), -1)` })
+            .from(labelOrder)
+            .where(eq(labelOrder.connectionId, activeConnection.id));
 
-        await ctx.db
-          .insert(labelOrder)
-          .values({
-            id: nanoid(),
-            connectionId: activeConnection.id,
-            labelId: createdLabel.id,
-            order: nextOrder,
-            customColor: labelColor,
-          })
-          .onConflictDoUpdate({
-            target: [labelOrder.connectionId, labelOrder.labelId],
-            set: {
+          const nextOrder = (maxOrderResult[0]?.maxOrder ?? -1) + 1;
+
+          await db
+            .insert(labelOrder)
+            .values({
+              id: nanoid(),
+              connectionId: activeConnection.id,
+              labelId: createdLabel.id,
+              order: nextOrder,
               customColor: labelColor,
-              updatedAt: new Date(),
-            },
-          });
+            })
+            .onConflictDoUpdate({
+              target: [labelOrder.connectionId, labelOrder.labelId],
+              set: {
+                customColor: labelColor,
+                updatedAt: new Date(),
+              },
+            });
+        } finally {
+          await conn.end();
+        }
       }
 
-      return createdLabel;
+      return createdLabel || { name: label.name, color: labelColor, type: 'user' };
     }),
   update: activeDriverProcedure
     .use(
@@ -191,33 +193,21 @@ export const labelsRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const { activeConnection } = ctx;
+      const agent = await getZeroAgent(activeConnection.id);
 
-      // Use a transaction to update all orders atomically
-      await ctx.db.transaction(async (tx) => {
-        for (const { id: labelId, order } of input.labelOrders) {
-          await tx
-            .insert(labelOrder)
-            .values({
-              id: nanoid(),
-              connectionId: activeConnection.id,
-              labelId,
-              order,
-            })
-            .onConflictDoUpdate({
-              target: [labelOrder.connectionId, labelOrder.labelId],
-              set: {
-                order,
-                updatedAt: new Date(),
-              },
-            });
-        }
-      });
-
+      await agent.updateLabelOrders(input.labelOrders);
       return { success: true };
     }),
   getOrders: activeDriverProcedure.query(async ({ ctx }) => {
     const { activeConnection } = ctx;
-    const ordersStr = await env.label_orders.get(`${activeConnection.id}_label_orders`);
-    return ordersStr ? JSON.parse(ordersStr) : null;
+    const agent = await getZeroAgent(activeConnection.id);
+    const labelOrders = await agent.getLabelOrders();
+
+    const ordersMap: Record<string, number> = {};
+    labelOrders.forEach((lo) => {
+      ordersMap[lo.labelId] = lo.order;
+    });
+
+    return Object.keys(ordersMap).length > 0 ? ordersMap : null;
   }),
 });

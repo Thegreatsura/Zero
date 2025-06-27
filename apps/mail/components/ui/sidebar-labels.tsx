@@ -47,15 +47,17 @@ const SidebarLabels = ({ data, activeAccount, stats }: Props) => {
               brackets: [] as typeof data,
               other: [] as typeof data,
               folders: {} as Record<string, typeof data>,
+              folderOrder: {} as Record<string, number>,
             };
 
-            data.forEach((label) => {
+            data.forEach((label, index) => {
               if (/\[.*\]/.test(label.name)) {
                 groups.brackets.push(label);
               } else if (/[^/]+\/[^/]+/.test(label.name)) {
                 const [groupName] = label.name.split('/') as [string];
                 if (!groups.folders[groupName]) {
                   groups.folders[groupName] = [];
+                  groups.folderOrder[groupName] = label.order ?? index;
                 }
                 groups.folders[groupName].push(label);
               } else {
@@ -66,18 +68,24 @@ const SidebarLabels = ({ data, activeAccount, stats }: Props) => {
             const components = [];
 
             Object.entries(groups.folders)
-              .sort(([a], [b]) => a.localeCompare(b))
+              .sort(([a], [b]) => {
+                const orderA = groups.folderOrder[a] ?? 999999;
+                const orderB = groups.folderOrder[b] ?? 999999;
+                return orderA - orderB;
+              })
               .forEach(([groupName, labels]) => {
                 const groupFolder = {
                   id: `group-${groupName}`,
                   name: groupName,
                   type: 'folder',
-                  labels: labels.map((label) => ({
-                    id: label.id,
-                    name: label.name.split('/').slice(1).join('/'),
-                    type: label.type,
-                    originalLabel: label,
-                  })),
+                  labels: labels
+                    .sort((a, b) => (a.order ?? 999999) - (b.order ?? 999999))
+                    .map((label) => ({
+                      id: label.id,
+                      name: label.name.split('/').slice(1).join('/'),
+                      type: label.type,
+                      originalLabel: label,
+                    })),
                 };
                 components.push(
                   <RecursiveFolder
@@ -112,12 +120,14 @@ const SidebarLabels = ({ data, activeAccount, stats }: Props) => {
                 id: 'group-other',
                 name: 'Other',
                 type: 'folder',
-                labels: groups.brackets.map((label) => ({
-                  id: label.id,
-                  name: label.name.replace(/\[|\]/g, ''),
-                  type: label.type,
-                  originalLabel: label,
-                })),
+                labels: groups.brackets
+                  .sort((a, b) => (a.order ?? 999999) - (b.order ?? 999999))
+                  .map((label) => ({
+                    id: label.id,
+                    name: label.name.replace(/\[|\]/g, ''),
+                    type: label.type,
+                    originalLabel: label,
+                  })),
               };
               components.push(
                 <RecursiveFolder

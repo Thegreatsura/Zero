@@ -19,6 +19,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { createSimpleAuth, type SimpleAuth } from '../lib/auth';
 import { connectionToDriver } from '../lib/server-utils';
 import type { CreateDraftData } from '../lib/schemas';
+import { connection, labelOrder } from '../db/schema';
 import { FOLDERS, parseHeaders } from '../lib/utils';
 import { env, RpcTarget } from 'cloudflare:workers';
 import { AIChatAgent } from 'agents/ai-chat-agent';
@@ -26,13 +27,13 @@ import { tools as authTools } from './agent/tools';
 import { processToolCalls } from './agent/utils';
 import type { Message as ChatMessage } from 'ai';
 import { getPromptName } from '../pipelines';
-import { connection } from '../db/schema';
+import { and, eq, sql } from 'drizzle-orm';
 import { getPrompt } from '../lib/brain';
 import { openai } from '@ai-sdk/openai';
-import { and, eq } from 'drizzle-orm';
 import { McpAgent } from 'agents/mcp';
 import { groq } from '@ai-sdk/groq';
 import { createDb } from '../db';
+import { nanoid } from 'nanoid';
 import { z } from 'zod';
 
 const decoder = new TextDecoder();
@@ -159,6 +160,14 @@ export class AgentRpcDO extends RpcTarget {
 
   async deleteLabel(id: string) {
     return await this.mainDo.deleteLabel(id);
+  }
+
+  async getLabelOrders() {
+    return await this.mainDo.getLabelOrders();
+  }
+
+  async updateLabelOrders(labelOrders: { id: string; order: number }[]) {
+    return await this.mainDo.updateLabelOrders(labelOrders);
   }
 
   async bulkDelete(threadIds: string[]) {
@@ -326,7 +335,7 @@ export class ZeroAgent extends AIChatAgent<typeof env> {
   }
 
   async dropTables() {
-    return this.sql`       
+    return this.sql`
         DROP TABLE IF EXISTS threads;`;
   }
 
@@ -713,6 +722,59 @@ export class ZeroAgent extends AIChatAgent<typeof env> {
     return await this.driver.deleteLabel(id);
   }
 
+  async getLabelOrders() {
+    const connectionId = this.name;
+    if (!connectionId) {
+      throw new Error('No connection ID available');
+    }
+
+    const { db, conn } = createDb(env.HYPERDRIVE.connectionString);
+    try {
+      const orders = await db
+        .select()
+        .from(labelOrder)
+        .where(eq(labelOrder.connectionId, connectionId));
+
+      return orders;
+    } finally {
+      await conn.end();
+    }
+  }
+
+  async updateLabelOrders(labelOrders: { id: string; order: number }[]) {
+    const connectionId = this.name;
+    if (!connectionId) {
+      throw new Error('No connection ID available');
+    }
+
+    const { db, conn } = createDb(env.HYPERDRIVE.connectionString);
+    try {
+      await db.transaction(async (tx) => {
+        for (const { id: labelId, order } of labelOrders) {
+          await tx
+            .insert(labelOrder)
+            .values({
+              id: nanoid(),
+              connectionId,
+              labelId,
+              order,
+            })
+            .onConflictDoUpdate({
+              target: [labelOrder.connectionId, labelOrder.labelId],
+              set: {
+                order,
+                updatedAt: new Date(),
+              },
+            });
+        }
+      });
+
+      return { success: true };
+    } finally {
+      await conn.end();
+    }
+  }
+
   async createDraft(draftData: CreateDraftData) {
     if (!this.driver) {
       throw new Error('No driver available');
@@ -844,12 +906,12 @@ export class ZeroAgent extends AIChatAgent<typeof env> {
 
         this.sql`
           INSERT OR REPLACE INTO threads (
-            id, 
-            thread_id, 
-            provider_id,  
-            latest_sender, 
-            latest_received_on, 
-            latest_subject, 
+            id,
+            thread_id,
+            provider_id,
+            latest_sender,
+            latest_received_on,
+            latest_subject,
             latest_label_ids,
             updated_at
           ) VALUES (
@@ -1002,9 +1064,9 @@ export class ZeroAgent extends AIChatAgent<typeof env> {
       if (whereConditions.length === 0) {
         // No conditions
         result = await this.sql`
-          SELECT id, latest_received_on 
-          FROM threads 
-          ORDER BY latest_received_on DESC 
+          SELECT id, latest_received_on
+          FROM threads
+          ORDER BY latest_received_on DESC
           LIMIT ${max}
         `;
       } else if (whereConditions.length === 1) {
@@ -1013,34 +1075,34 @@ export class ZeroAgent extends AIChatAgent<typeof env> {
         if (condition.includes('latest_received_on <')) {
           const cursorValue = cursor!;
           result = await this.sql`
-            SELECT id, latest_received_on 
-            FROM threads 
+            SELECT id, latest_received_on
+            FROM threads
             WHERE latest_received_on < ${cursorValue}
-            ORDER BY latest_received_on DESC 
+            ORDER BY latest_received_on DESC
             LIMIT ${max}
           `;
         } else if (folder) {
           // Folder condition
           const folderLabel = folder.toUpperCase();
           result = await this.sql`
-            SELECT id, latest_received_on 
-            FROM threads 
+            SELECT id, latest_received_on
+            FROM threads
             WHERE EXISTS (
               SELECT 1 FROM json_each(latest_label_ids) WHERE value = ${folderLabel}
             )
-            ORDER BY latest_received_on DESC 
+            ORDER BY latest_received_on DESC
             LIMIT ${max}
           `;
         } else {
           // Single label condition
           const labelId = labelIds[0];
           result = await this.sql`
-            SELECT id, latest_received_on 
-            FROM threads 
+            SELECT id, latest_received_on
+            FROM threads
             WHERE EXISTS (
               SELECT 1 FROM json_each(latest_label_ids) WHERE value = ${labelId}
             )
-            ORDER BY latest_received_on DESC 
+            ORDER BY latest_received_on DESC
             LIMIT ${max}
           `;
         }
@@ -1050,34 +1112,34 @@ export class ZeroAgent extends AIChatAgent<typeof env> {
           // Folder + cursor
           const folderLabel = folder.toUpperCase();
           result = await this.sql`
-            SELECT id, latest_received_on 
-            FROM threads 
+            SELECT id, latest_received_on
+            FROM threads
             WHERE EXISTS (
               SELECT 1 FROM json_each(latest_label_ids) WHERE value = ${folderLabel}
             ) AND latest_received_on < ${cursor}
-            ORDER BY latest_received_on DESC 
+            ORDER BY latest_received_on DESC
             LIMIT ${max}
           `;
         } else if (labelIds.length === 1 && cursor && !folder) {
           // Single label + cursor
           const labelId = labelIds[0];
           result = await this.sql`
-            SELECT id, latest_received_on 
-            FROM threads 
+            SELECT id, latest_received_on
+            FROM threads
             WHERE EXISTS (
               SELECT 1 FROM json_each(latest_label_ids) WHERE value = ${labelId}
             ) AND latest_received_on < ${cursor}
-            ORDER BY latest_received_on DESC 
+            ORDER BY latest_received_on DESC
             LIMIT ${max}
           `;
         } else {
           // For now, fallback to just cursor if complex combinations
           const cursorValue = cursor || '';
           result = await this.sql`
-            SELECT id, latest_received_on 
-            FROM threads 
+            SELECT id, latest_received_on
+            FROM threads
             WHERE latest_received_on < ${cursorValue}
-            ORDER BY latest_received_on DESC 
+            ORDER BY latest_received_on DESC
             LIMIT ${max}
           `;
         }
@@ -1107,7 +1169,7 @@ export class ZeroAgent extends AIChatAgent<typeof env> {
   async getThreadFromDB(id: string): Promise<IGetThreadResponse> {
     try {
       const result = this.sql`
-        SELECT 
+        SELECT
           id,
           thread_id,
           provider_id,
