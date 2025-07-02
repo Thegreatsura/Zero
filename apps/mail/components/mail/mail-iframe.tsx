@@ -161,7 +161,7 @@ export function MailIframe({ html, senderEmail }: { html: string; senderEmail: s
         height={height}
         ref={iframeRef}
         className={cn(
-          '!min-h-0 w-full flex-1 overflow-hidden px-4 transition-opacity duration-200',
+          'min-h-0! w-full flex-1 overflow-hidden px-4 transition-opacity duration-200',
         )}
         title="Email Content"
         style={{

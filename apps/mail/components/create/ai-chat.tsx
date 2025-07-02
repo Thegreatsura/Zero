@@ -31,7 +31,7 @@ const renderThread = (thread: { id: string; title: string; snippet: string }) =>
     <div
       onClick={handleClick}
       key={thread.id}
-      className="hover:bg-offsetLight/30 dark:hover:bg-offsetDark/30 cursor-pointer rounded-lg"
+      className="hover:bg-offset-light/30 dark:hover:bg-offset-dark/30 cursor-pointer rounded-lg"
     >
       <div className="flex cursor-pointer items-center justify-between p-2">
         <div className="flex w-full items-center gap-3">
@@ -92,16 +92,16 @@ const ExampleQueries = ({ onQueryClick }: { onQueryClick: (query: string) => voi
             <button
               key={index}
               onClick={() => onQueryClick(query)}
-              className="flex-shrink-0 whitespace-nowrap rounded-md bg-[#f0f0f0] p-1 px-2 text-sm text-[#555555] dark:bg-[#262626] dark:text-[#929292]"
+              className="shrink-0 whitespace-nowrap rounded-md bg-[#f0f0f0] p-1 px-2 text-sm text-[#555555] dark:bg-[#262626] dark:text-[#929292]"
             >
               {query}
             </button>
           ))}
         </div>
         {/* Left mask */}
-        <div className="from-panelLight dark:from-panelDark pointer-events-none absolute bottom-0 left-0 top-0 w-12 bg-gradient-to-r to-transparent"></div>
+        <div className="from-panel-light dark:from-panel-dark bg-linear-to-r pointer-events-none absolute bottom-0 left-0 top-0 w-12 to-transparent"></div>
         {/* Right mask */}
-        <div className="from-panelLight dark:from-panelDark pointer-events-none absolute bottom-0 right-0 top-0 w-12 bg-gradient-to-l to-transparent"></div>
+        <div className="from-panel-light dark:from-panel-dark bg-linear-to-l pointer-events-none absolute bottom-0 right-0 top-0 w-12 to-transparent"></div>
       </div>
 
       {/* Second row */}
@@ -111,16 +111,16 @@ const ExampleQueries = ({ onQueryClick }: { onQueryClick: (query: string) => voi
             <button
               key={index}
               onClick={() => onQueryClick(query)}
-              className="flex-shrink-0 whitespace-nowrap rounded-md bg-[#f0f0f0] p-1 px-2 text-sm text-[#555555] dark:bg-[#262626] dark:text-[#929292]"
+              className="shrink-0 whitespace-nowrap rounded-md bg-[#f0f0f0] p-1 px-2 text-sm text-[#555555] dark:bg-[#262626] dark:text-[#929292]"
             >
               {query}
             </button>
           ))}
         </div>
         {/* Left mask */}
-        <div className="from-panelLight dark:from-panelDark pointer-events-none absolute bottom-0 left-0 top-0 w-12 bg-gradient-to-r to-transparent"></div>
+        <div className="from-panel-light dark:from-panel-dark bg-linear-to-r pointer-events-none absolute bottom-0 left-0 top-0 w-12 to-transparent"></div>
         {/* Right mask */}
-        <div className="from-panelLight dark:from-panelDark pointer-events-none absolute bottom-0 right-0 top-0 w-12 bg-gradient-to-l to-transparent"></div>
+        <div className="from-panel-light dark:from-panel-dark bg-linear-to-l pointer-events-none absolute bottom-0 right-0 top-0 w-12 to-transparent"></div>
       </div>
     </div>
   );
@@ -231,7 +231,7 @@ const ToolResponse = ({ toolName, result, args }: { toolName: string; result: an
       {globalThis.DEBUG ? (
         <Tooltip>
           <TooltipTrigger asChild>
-            <InfoIcon className="fill-subtleWhite text-subtleBlack dark:fill-subtleBlack h-4 w-4 dark:text-[#373737]" />
+            <InfoIcon className="fill-subtle-white text-subtle-black dark:fill-subtle-black h-4 w-4 dark:text-[#373737]" />
           </TooltipTrigger>
           <TooltipContent>
             <div className="text-xs">
@@ -363,7 +363,7 @@ export function AIChat({
                       className={cn(
                         'flex w-fit flex-col gap-2 rounded-lg text-sm',
                         message.role === 'user'
-                          ? 'overflow-wrap-anywhere text-offsetDark dark:text-subtleWhite ml-auto break-words bg-[#f0f0f0] px-2 py-1 dark:bg-[#252525]'
+                          ? 'overflow-wrap-anywhere text-offset-dark dark:text-subtle-white ml-auto break-words bg-[#f0f0f0] px-2 py-1 dark:bg-[#252525]'
                           : 'overflow-wrap-anywhere mr-auto break-words p-2',
                       )}
                     >
@@ -394,8 +394,8 @@ export function AIChat({
       </div>
 
       {/* Fixed input at bottom */}
-      <div className={cn('mb-4 flex-shrink-0 px-4', isFullScreen ? 'px-0' : '')}>
-        <div className="bg-offsetLight relative rounded-lg p-2 dark:bg-[#202020]">
+      <div className={cn('mb-4 shrink-0 px-4', isFullScreen ? 'px-0' : '')}>
+        <div className="bg-offset-light relative rounded-lg p-2 dark:bg-[#202020]">
           <div className="flex flex-col">
             <div className="w-full">
               <form id="ai-chat-form" onSubmit={onSubmit} className="relative">
@@ -434,7 +434,7 @@ export function AIChat({
           <Select
 
           >
-            <SelectTrigger className="flex h-6 w-fit cursor-pointer items-center justify-between gap-1 border-0 dark:bg-[#141414] px-2 text-xs hover:bg-[#1E1E1E]">
+            <SelectTrigger className="flex h-6 w-fit cursor-pointer items-center justify-between gap-1 border-0 dark:bg-dark-background px-2 text-xs hover:bg-[#1E1E1E]">
               <div className="flex items-center gap-1.5 w-full">
                 <Puzzle className="h-3.5 w-3.5 fill-white dark:fill-[#929292]" />
               </div>
@@ -470,7 +470,7 @@ export function AIChat({
               onModelChange?.(value);
             }}
           >
-            <SelectTrigger className="flex h-6 w-fit cursor-pointer items-center justify-between gap-1 border-0 dark:bg-[#141414] px-2 text-xs hover:bg-[#1E1E1E]">
+            <SelectTrigger className="flex h-6 w-fit cursor-pointer items-center justify-between gap-1 border-0 dark:bg-dark-background px-2 text-xs hover:bg-[#1E1E1E]">
               <div className="flex items-center gap-1.5 w-full">
                 {selectedModel === 'gpt-3.5' ? (
                   <img src="/openai.png" alt="OpenAI" className="h-3.5 w-3.5 dark:invert" />

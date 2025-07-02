@@ -101,7 +101,7 @@ export const SetupInboxDialog = () => {
     <Dialog>
       <DialogTrigger asChild>
         <Button variant="ghost" className="md:h-fit md:px-2">
-          <OldPhone className="fill-iconLight dark:fill-iconDark h-4 w-4" />
+          <OldPhone className="fill-icon-light dark:fill-icon-dark h-4 w-4" />
         </Button>
       </DialogTrigger>
       <DialogContent showOverlay>
@@ -193,7 +193,7 @@ export const CallInboxDialog = () => {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="md:h-fit md:px-2">
-          <OldPhone className="fill-iconLight dark:fill-iconDark h-4 w-4" />
+          <OldPhone className="fill-icon-light dark:fill-icon-dark h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent>
@@ -202,7 +202,7 @@ export const CallInboxDialog = () => {
             to={`tel:${import.meta.env.VITE_PUBLIC_PHONE_NUMBER}`}
             className="flex items-center gap-2"
           >
-            <OldPhone className="fill-iconLight dark:fill-iconDark h-4 w-4" />
+            <OldPhone className="fill-icon-light dark:fill-icon-dark h-4 w-4" />
             Call
           </Link>
         </DropdownMenuItem>

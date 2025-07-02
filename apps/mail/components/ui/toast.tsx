@@ -20,21 +20,21 @@ const Toaster = () => {
       }}
       toastOptions={{
         classNames: {
-          title: 'title flex-1 justify-center !text-black dark:!text-white text-sm leading-none',
-          description: '!text-black dark:!text-white text-xs',
+          title: 'title flex-1 justify-center text-black! dark:text-white! text-sm leading-none',
+          description: 'text-black! dark:text-white! text-xs',
           toast: 'p-1',
           actionButton:
-            'inline-flex h-7 items-center justify-center gap-1 overflow-hidden !rounded-md border px-1.5 dark:border-none !bg-[#E0E0E0] dark:!bg-[#424242]',
+            'inline-flex h-7 items-center justify-center gap-1 overflow-hidden rounded-md! border px-1.5 dark:border-none bg-[#E0E0E0]! dark:bg-[#424242]!',
           cancelButton:
-            'inline-flex h-7 items-center justify-center gap-1 overflow-hidden !rounded-md border px-1.5 dark:border-none !bg-[#E0E0E0] dark:!bg-[#424242]',
+            'inline-flex h-7 items-center justify-center gap-1 overflow-hidden rounded-md! border px-1.5 dark:border-none bg-[#E0E0E0]! dark:bg-[#424242]!',
           closeButton:
-            'inline-flex h-7 items-center justify-center gap-1 overflow-hidden !rounded-md border px-1.5 dark:border-none !bg-[#E0E0E0] dark:!bg-[#424242]',
+            'inline-flex h-7 items-center justify-center gap-1 overflow-hidden rounded-md! border px-1.5 dark:border-none bg-[#E0E0E0]! dark:bg-[#424242]!',
           loading: 'pl-3 -mr-3 loading',
           loader: 'pl-3 loader -mr-3',
           icon: 'pl-3 icon mr-2',
           content: 'p-1.5 pl-2',
           default:
-            'w-96 p-1.5 bg-white dark:bg-[#2C2C2C] rounded-xl inline-flex items-center gap-2 overflow-visible border dark:border-none',
+            'w-96 p-1.5 bg-white! dark:bg-[#2C2C2C]! rounded-xl! inline-flex items-center gap-2 overflow-visible border! dark:border-none!',
         },
       }}
     />

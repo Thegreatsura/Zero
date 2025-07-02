@@ -308,7 +308,7 @@ const Thread = memo(
             data-thread-id={idToUse}
             key={idToUse}
             className={cn(
-              'hover:bg-offsetLight hover:bg-primary/5 group relative mx-1 flex cursor-pointer flex-col items-start rounded-lg py-2 text-left text-sm transition-all hover:opacity-100',
+              'hover:bg-offset-light hover:bg-primary/5 group relative mx-1 flex cursor-pointer flex-col items-start rounded-lg py-2 text-left text-sm transition-all hover:opacity-100',
               (isMailSelected || isMailBulkSelected || isKeyboardFocused) &&
                 'border-border bg-primary/5 opacity-100',
               isKeyboardFocused && 'ring-primary/50',
@@ -318,7 +318,7 @@ const Thread = memo(
           >
             <div
               className={cn(
-                'dark:bg-panelDark absolute right-2 z-[25] flex -translate-y-1/2 items-center gap-1 rounded-xl border bg-white p-1 opacity-0 shadow-sm group-hover:opacity-100',
+                'dark:bg-panel-dark z-25 absolute right-2 flex -translate-y-1/2 items-center gap-1 rounded-xl border bg-white p-1 opacity-0 shadow-sm group-hover:opacity-100',
                 index === 0 ? 'top-4' : 'top-[-1]',
               )}
             >
@@ -367,7 +367,7 @@ const Thread = memo(
                 </TooltipTrigger>
                 <TooltipContent
                   side={index === 0 ? 'bottom' : 'top'}
-                  className="dark:bg-panelDark mb-1 bg-white"
+                  className="dark:bg-panel-dark mb-1 bg-white"
                 >
                   {m['common.mail.toggleImportant']()}
                 </TooltipContent>
@@ -388,7 +388,7 @@ const Thread = memo(
                 </TooltipTrigger>
                 <TooltipContent
                   side={index === 0 ? 'bottom' : 'top'}
-                  className="dark:bg-panelDark mb-1 bg-white"
+                  className="dark:bg-panel-dark mb-1 bg-white"
                 >
                   {m['common.threadDisplay.archive']()}
                 </TooltipContent>
@@ -410,7 +410,7 @@ const Thread = memo(
                   </TooltipTrigger>
                   <TooltipContent
                     side={index === 0 ? 'bottom' : 'top'}
-                    className="dark:bg-panelDark mb-1 bg-white"
+                    className="dark:bg-panel-dark mb-1 bg-white"
                   >
                     {m['common.actions.Bin']()}
                   </TooltipContent>
@@ -675,7 +675,7 @@ const Draft = memo(({ message }: { message: { id: string } }) => {
       <div
         key={message.id}
         className={cn(
-          'hover:bg-offsetLight hover:bg-primary/5 group relative mx-[8px] flex cursor-pointer flex-col items-start overflow-clip rounded-[10px] border-transparent py-3 text-left text-sm transition-all hover:opacity-100',
+          'hover:bg-offset-light hover:bg-primary/5 group relative mx-[8px] flex cursor-pointer flex-col items-start overflow-clip rounded-[10px] border-transparent py-3 text-left text-sm transition-all hover:opacity-100',
         )}
       >
         <div

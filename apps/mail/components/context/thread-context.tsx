@@ -463,7 +463,7 @@ export function ThreadContextMenu({
         {children}
       </ContextMenuTrigger>
       <ContextMenuContent
-        className="dark:bg-panelDark w-56 overflow-y-auto bg-white"
+        className="dark:bg-panel-dark w-56 overflow-y-auto bg-white"
         onContextMenu={(e) => e.preventDefault()}
       >
         {primaryActions.map(renderAction)}
@@ -475,7 +475,7 @@ export function ThreadContextMenu({
             <Tag className="mr-2.5 h-4 w-4 opacity-60" />
             {m['common.mail.labels']()}
           </ContextMenuSubTrigger>
-          <ContextMenuSubContent className="dark:bg-panelDark max-h-[520px] w-48 overflow-y-auto bg-white">
+          <ContextMenuSubContent className="dark:bg-panel-dark max-h-[520px] w-48 overflow-y-auto bg-white">
             <LabelsList threadId={threadId} bulkSelected={mail.bulkSelected} />
           </ContextMenuSubContent>
         </ContextMenuSub>

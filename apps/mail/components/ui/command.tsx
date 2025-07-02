@@ -32,7 +32,7 @@ const CommandDialog = ({ children, ...props }: DialogProps) => {
       <DialogDescription className="sr-only">Command</DialogDescription>
       <DialogContent
         showOverlay={true}
-        className="dark:bg-panelDark w-full overflow-hidden rounded-xl border-none bg-white p-0 sm:max-w-lg [&>button:last-child]:hidden"
+        className="dark:bg-panel-dark w-full overflow-hidden rounded-xl border-none bg-white p-0 sm:max-w-lg [&>button:last-child]:hidden"
       >
         <Command className="[&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group]]:px-2 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-3 [&_[cmdk-item]]:py-2">
           {children}
@@ -46,8 +46,8 @@ const CommandInput = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Input>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.Input>
 >(({ className, ...props }, ref) => (
-  <div className="border-input flex items-center border-none w-full px-5" cmdk-input-wrapper="">
-    <Search className="fill-iconLight me-3 relative top-0.5 text-muted-foreground/80 h-4 w-4" />
+  <div className="border-input flex w-full items-center border-none px-5" cmdk-input-wrapper="">
+    <Search className="fill-icon-light text-muted-foreground/80 relative top-0.5 me-3 h-4 w-4" />
     <CommandPrimitive.Input
       ref={ref}
       className={cn(

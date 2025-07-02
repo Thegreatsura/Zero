@@ -126,13 +126,13 @@ export function PromptsDialog() {
           <TooltipTrigger asChild>
             <DialogTrigger asChild>
               <Button variant="ghost" className="md:h-fit md:px-2 [&>svg]:size-3">
-                <Paper className="dark:fill-iconDark fill-iconLight h-3.5 w-3.5" />
+                <Paper className="dark:fill-icon-dark fill-icon-light h-3.5 w-3.5" />
               </Button>
             </DialogTrigger>
           </TooltipTrigger>
           <TooltipContent>Prompts</TooltipContent>
         </Tooltip>
-        <DialogContent className="max-w-screen-lg" showOverlay={true}>
+        <DialogContent className="max-w-(--breakpoint-lg)" showOverlay={true}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               ZeroAI System Prompts{' '}

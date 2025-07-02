@@ -199,7 +199,7 @@ export function NavUser() {
                 </div>
               </DropdownMenuTrigger>
               <DropdownMenuContent
-                className="ml-3 w-[--radix-dropdown-menu-trigger-width] min-w-56 bg-white font-medium dark:bg-[#131313]"
+                className="w-(--radix-dropdown-menu-trigger-width) ml-3 min-w-56 bg-white font-medium dark:bg-[#131313]"
                 align="end"
                 side={'bottom'}
                 sideOffset={8}
@@ -232,7 +232,7 @@ export function NavUser() {
                           {activeAccount.name || session.user.name || 'User'}
                           {isPro && (
                             <BadgeCheck
-                              className="h-4 w-4 text-white dark:text-[#141414]"
+                              className="dark:text-dark-background h-4 w-4 text-white"
                               fill="#1D9BF0"
                             />
                           )}
@@ -348,7 +348,7 @@ export function NavUser() {
                   onClick={handleAccountSwitch(activeAccount.id)}
                   className={`flex cursor-pointer items-center ${
                     activeAccount.id === activeConnection?.id && data.connections.length > 1
-                      ? 'outline-mainBlue rounded-[5px] outline outline-2'
+                      ? 'outline-main-blue rounded-[5px] outline outline-2'
                       : ''
                   }`}
                 >
@@ -369,7 +369,7 @@ export function NavUser() {
                       </AvatarFallback>
                     </Avatar>
                     {activeAccount.id === activeConnection?.id && data.connections.length > 1 && (
-                      <CircleCheck className="fill-mainBlue absolute -bottom-2 -right-2 size-4 rounded-full bg-white dark:bg-[#141414]" />
+                      <CircleCheck className="fill-main-blue dark:bg-dark-background absolute -bottom-2 -right-2 size-4 rounded-full bg-white" />
                     )}
                   </div>
                 </div>
@@ -387,7 +387,7 @@ export function NavUser() {
                       onClick={handleAccountSwitch(connection.id)}
                       className={`flex cursor-pointer items-center ${
                         connection.id === activeConnection?.id && otherConnections.length > 1
-                          ? 'outline-mainBlue rounded-[5px] outline outline-2'
+                          ? 'outline-main-blue rounded-[5px] outline outline-2'
                           : ''
                       }`}
                     >
@@ -408,7 +408,7 @@ export function NavUser() {
                           </AvatarFallback>
                         </Avatar>
                         {connection.id === activeConnection?.id && otherConnections.length > 1 && (
-                          <CircleCheck className="fill-mainBlue absolute -bottom-2 -right-2 size-4 rounded-full bg-white dark:bg-black" />
+                          <CircleCheck className="fill-main-blue absolute -bottom-2 -right-2 size-4 rounded-full bg-white dark:bg-black" />
                         )}
                       </div>
                     </div>
@@ -479,7 +479,7 @@ export function NavUser() {
                 <>
                   <Button
                     onClick={() => setPricingDialog('true')}
-                    className="hover:bg-offsetLight/80 flex h-7 w-7 cursor-pointer items-center justify-center rounded-[5px] border border-dashed bg-transparent px-0 text-black dark:bg-[#262626] dark:text-[#929292]"
+                    className="hover:bg-offset-light/80 flex h-7 w-7 cursor-pointer items-center justify-center rounded-[5px] border border-dashed bg-transparent px-0 text-black dark:bg-[#262626] dark:text-[#929292]"
                   >
                     <Plus className="size-4" />
                   </Button>
@@ -496,7 +496,7 @@ export function NavUser() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className={cn('md:h-fit md:px-2')}>
-                    <ThreeDots className="fill-iconLight dark:fill-iconDark" />
+                    <ThreeDots className="fill-icon-light dark:fill-icon-dark" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
@@ -581,10 +581,13 @@ export function NavUser() {
                 {activeAccount?.name || session.user.name || 'User'}
               </p>
               {isPro ? (
-                <BadgeCheck className="h-4 w-4 text-white dark:text-[#141414]" fill="#1D9BF0" />
+                <BadgeCheck
+                  className="dark:text-dark-background h-4 w-4 text-white"
+                  fill="#1D9BF0"
+                />
               ) : null}
             </div>
-            <div className="h-5 max-w-[200px] overflow-hidden truncate text-xs font-normal leading-none text-[#898989]">
+            <div className="text-icon-dark h-5 max-w-[200px] overflow-hidden truncate text-xs font-normal leading-none">
               {activeAccount?.email || session.user.email}
             </div>
             {!isPro && (
@@ -592,7 +595,10 @@ export function NavUser() {
                 onClick={() => setPricingDialog('true')}
                 className="flex h-5 items-center gap-1 rounded-full border px-1 pr-1.5 hover:bg-transparent"
               >
-                <BadgeCheck className="h-4 w-4 text-white dark:text-[#141414]" fill="#1D9BF0" />
+                <BadgeCheck
+                  className="dark:text-dark-background h-4 w-4 text-white"
+                  fill="#1D9BF0"
+                />
                 <span className="text-muted-foreground text-[10px] uppercase">Get verified</span>
               </button>
             )}

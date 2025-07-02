@@ -77,7 +77,7 @@ export const AddConnectionDialog = ({
               You can only connect 1 email in the free tier.{' '}
               <span
                 onClick={handleUpgrade}
-                className="hover:bg-subtleWhite hover:text-subtleBlack cursor-pointer underline"
+                className="hover:bg-subtle-white hover:text-subtle-black cursor-pointer underline"
               >
                 Start 7 day free trial
               </span>{' '}
@@ -116,7 +116,7 @@ export const AddConnectionDialog = ({
                     })
                   }
                 >
-                  <Icon className="!size-6" />
+                  <Icon className="size-6!" />
                   <span className="text-xs">{provider.name}</span>
                 </Button>
               </motion.div>

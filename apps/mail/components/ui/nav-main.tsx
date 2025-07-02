@@ -188,7 +188,7 @@ export function NavMain({ items }: NavMainProps) {
             <SidebarMenuButton
               onClick={() => show()}
               tooltip={state === 'collapsed' ? m['common.commandPalette.groups.help']() : undefined}
-              className="hover:bg-subtleWhite flex cursor-pointer items-center dark:hover:bg-[#202020]"
+              className="hover:bg-subtle-white flex cursor-pointer items-center dark:hover:bg-[#202020]"
             >
               <OldPhone className="relative mr-2.5 h-2 w-2 fill-[#8F8F8F]" />
               <p className="relative bottom-0.5 mt-0.5 truncate text-[13px]">Live Support</p>
@@ -213,7 +213,7 @@ export function NavMain({ items }: NavMainProps) {
             <SidebarMenuItem>
               {state !== 'collapsed' ? (
                 section.title ? (
-                  <p className="text-muted-foreground mx-2 mb-2 text-[13px] dark:text-[#898989]">
+                  <p className="text-muted-foreground dark:text-icon-dark mx-2 mb-2 text-[13px]">
                     {section.title}
                   </p>
                 ) : null
@@ -239,7 +239,7 @@ export function NavMain({ items }: NavMainProps) {
           <Collapsible defaultOpen={true} className="group/collapsible flex-col">
             <SidebarMenuItem className="mb-4" style={{ height: 'auto' }}>
               <div className="mx-2 mb-4 flex items-center justify-between">
-                <span className="text-muted-foreground text-[13px] dark:text-[#898989]">
+                <span className="text-muted-foreground dark:text-icon-dark text-[13px]">
                   {activeAccount?.providerId === 'google' ? 'Labels' : 'Folders'}
                 </span>
                 {activeAccount?.providerId === 'google' ? (
@@ -250,7 +250,7 @@ export function NavMain({ items }: NavMainProps) {
                         size="icon"
                         className="mr-1 h-4 w-4 p-0 hover:bg-transparent"
                       >
-                        <Plus className="text-muted-foreground h-3 w-3 dark:text-[#898989]" />
+                        <Plus className="text-muted-foreground dark:text-icon-dark h-3 w-3" />
                       </Button>
                     }
                     onSubmit={onSubmit}
@@ -283,7 +283,7 @@ function NavItem(item: NavItemProps & { href: string }) {
         className="flex cursor-not-allowed items-center opacity-50"
       >
         {item.icon && <item.icon ref={iconRef} className="relative mr-2.5 h-3 w-3.5" />}
-        <p className="relative bottom-[1px] mt-0.5 truncate text-[13px]">{item.title}</p>
+        <p className="relative bottom-px mt-0.5 truncate text-[13px]">{item.title}</p>
       </SidebarMenuButton>
     );
   }
@@ -302,14 +302,14 @@ function NavItem(item: NavItemProps & { href: string }) {
           asChild
           tooltip={state === 'collapsed' ? item.title : undefined}
           className={cn(
-            'hover:bg-subtleWhite flex items-center dark:hover:bg-[#202020]',
-            item.isActive && 'bg-subtleWhite text-accent-foreground dark:bg-[#202020]',
+            'hover:bg-subtle-white flex items-center dark:hover:bg-[#202020]',
+            item.isActive && 'bg-subtle-white text-accent-foreground dark:bg-[#202020]',
           )}
           onClick={handleClick}
         >
           <Link target={item.target} to={item.href}>
             {item.icon && <item.icon ref={iconRef} className="mr-2 shrink-0" />}
-            <p className="relative bottom-[1px] mt-0.5 min-w-0 flex-1 truncate text-[13px]">
+            <p className="relative bottom-px mt-0.5 min-w-0 flex-1 truncate text-[13px]">
               {item.title}
             </p>
             {stats &&

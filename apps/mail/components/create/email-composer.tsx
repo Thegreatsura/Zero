@@ -16,17 +16,21 @@ import {
 import { Check, Command, Loader, Paperclip, Plus, X as XIcon } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { TextEffect } from '@/components/motion-primitives/text-effect';
+import { ImageCompressionSettings } from './image-compression-settings';
 import { useActiveConnection } from '@/hooks/use-connections';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useEmailAliases } from '@/hooks/use-email-aliases';
+import type { ImageQuality } from '@/lib/image-compression';
 import useComposeEditor from '@/hooks/use-compose-editor';
 import { CurvedArrow, Sparkles, X } from '../icons/icons';
+import { compressImages } from '@/lib/image-compression';
 import { AnimatePresence, motion } from 'motion/react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Avatar, AvatarFallback } from '../ui/avatar';
 import { useTRPC } from '@/providers/query-provider';
 import { useMutation } from '@tanstack/react-query';
 import { useSettings } from '@/hooks/use-settings';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { cn, formatFileSize } from '@/lib/utils';
 import { useThread } from '@/hooks/use-threads';
 import { serializeFiles } from '@/lib/schemas';
@@ -38,10 +42,6 @@ import { useQueryState } from 'nuqs';
 import pluralize from 'pluralize';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { ImageCompressionSettings } from './image-compression-settings';
-import { compressImages } from '@/lib/image-compression';
-import type { ImageQuality } from '@/lib/image-compression';
-import { useIsMobile } from '@/hooks/use-mobile';
 
 type ThreadContent = {
   from: string;
@@ -190,7 +190,10 @@ export function EmailComposer({
           });
 
           if (totalOriginalSize > totalCompressedSize) {
-            const savings = (((totalOriginalSize - totalCompressedSize) / totalOriginalSize) * 100).toFixed(1);
+            const savings = (
+              ((totalOriginalSize - totalCompressedSize) / totalOriginalSize) *
+              100
+            ).toFixed(1);
             if (parseFloat(savings) > 0.1) {
               toast.success(`Images compressed: ${savings}% smaller`);
             }
@@ -693,7 +696,7 @@ export function EmailComposer({
         className,
       )}
     >
-      <div className="no-scrollbar dark:bg-panelDark flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <div className="no-scrollbar dark:bg-panel-dark flex min-h-0 flex-1 flex-col overflow-y-auto">
         {/* To, Cc, Bcc */}
         <div className="shrink-0 overflow-y-auto border-b border-[#E7E7E7] pb-2 dark:border-[#252525]">
           <div className="flex justify-between px-3 pt-3">
@@ -718,7 +721,7 @@ export function EmailComposer({
                     >
                       <span className="flex gap-1 py-0.5 text-sm text-black dark:text-white">
                         <Avatar className="h-5 w-5">
-                          <AvatarFallback className="bg-offsetLight text-muted-foreground dark:bg-muted rounded-full text-xs font-bold dark:text-[#9B9B9B]">
+                          <AvatarFallback className="bg-offset-light text-muted-foreground dark:bg-muted rounded-full text-xs font-bold dark:text-[#9B9B9B]">
                             {email.charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
@@ -850,7 +853,7 @@ export function EmailComposer({
                         >
                           <span className="flex gap-1 py-0.5 text-sm text-black dark:text-white">
                             <Avatar className="h-5 w-5">
-                              <AvatarFallback className="bg-offsetLight text-muted-foreground rounded-full text-xs font-bold dark:bg-[#373737] dark:text-[#9B9B9B]">
+                              <AvatarFallback className="bg-offset-light text-muted-foreground rounded-full text-xs font-bold dark:bg-[#373737] dark:text-[#9B9B9B]">
                                 {email.charAt(0).toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
@@ -932,7 +935,7 @@ export function EmailComposer({
                       >
                         <span className="flex gap-1 py-0.5 text-sm text-black dark:text-white">
                           <Avatar className="h-5 w-5">
-                            <AvatarFallback className="bg-offsetLight text-muted-foreground rounded-full text-xs font-bold dark:bg-[#373737] dark:text-[#9B9B9B]">
+                            <AvatarFallback className="bg-offset-light text-muted-foreground rounded-full text-xs font-bold dark:bg-[#373737] dark:text-[#9B9B9B]">
                               {email.charAt(0).toUpperCase()}
                             </AvatarFallback>
                           </Avatar>
@@ -1023,7 +1026,7 @@ export function EmailComposer({
                           >
                             <span className="flex gap-1 py-0.5 text-sm text-black dark:text-white">
                               <Avatar className="h-5 w-5">
-                                <AvatarFallback className="bg-offsetLight text-muted-foreground rounded-full text-xs font-bold dark:bg-[#373737] dark:text-[#9B9B9B]">
+                                <AvatarFallback className="bg-offset-light text-muted-foreground rounded-full text-xs font-bold dark:bg-[#373737] dark:text-[#9B9B9B]">
                                   {email.charAt(0).toUpperCase()}
                                 </AvatarFallback>
                               </Avatar>
@@ -1078,7 +1081,7 @@ export function EmailComposer({
                       >
                         <span className="flex gap-1 py-0.5 text-sm text-black dark:text-white">
                           <Avatar className="h-5 w-5">
-                            <AvatarFallback className="bg-offsetLight text-muted-foreground rounded-full text-xs font-bold dark:bg-[#373737] dark:text-[#9B9B9B]">
+                            <AvatarFallback className="bg-offset-light text-muted-foreground rounded-full text-xs font-bold dark:bg-[#373737] dark:text-[#9B9B9B]">
                               {email.charAt(0).toUpperCase()}
                             </AvatarFallback>
                           </Avatar>
@@ -1169,7 +1172,7 @@ export function EmailComposer({
                           >
                             <span className="flex gap-1 py-0.5 text-sm text-black dark:text-white">
                               <Avatar className="h-5 w-5">
-                                <AvatarFallback className="bg-offsetLight text-muted-foreground rounded-full text-xs font-bold dark:bg-[#373737] dark:text-[#9B9B9B]">
+                                <AvatarFallback className="bg-offset-light text-muted-foreground rounded-full text-xs font-bold dark:bg-[#373737] dark:text-[#9B9B9B]">
                                   {email.charAt(0).toUpperCase()}
                                 </AvatarFallback>
                               </Avatar>
@@ -1245,7 +1248,7 @@ export function EmailComposer({
               <SelectTrigger className="h-6 flex-1 border-0 bg-transparent p-0 text-sm font-normal text-black placeholder:text-[#797979] focus:outline-none focus:ring-0 dark:text-white/90">
                 <SelectValue placeholder="Select an email address" />
               </SelectTrigger>
-              <SelectContent className="z-[99999]">
+              <SelectContent className="z-99999">
                 {aliases.map((alias) => (
                   <SelectItem key={alias.email} value={alias.email}>
                     <div className="flex flex-row items-center gap-1">
@@ -1324,7 +1327,7 @@ export function EmailComposer({
                   </button>
                 </PopoverTrigger>
                 <PopoverContent
-                  className="z-[100] w-[340px] rounded-lg p-0 shadow-lg dark:bg-[#202020]"
+                  className="z-100 w-[340px] rounded-lg p-0 shadow-lg dark:bg-[#202020]"
                   align="start"
                   sideOffset={6}
                 >
@@ -1337,7 +1340,7 @@ export function EmailComposer({
                         {pluralize('file', attachments.length, true)}
                       </p>
                     </div>
-                    
+
                     <div className="border-b border-[#E7E7E7] p-3 dark:border-[#2B2B2B]">
                       <ImageCompressionSettings
                         quality={imageQuality}
@@ -1345,7 +1348,7 @@ export function EmailComposer({
                         className="border-0 shadow-none"
                       />
                     </div>
-                    
+
                     <div className="max-h-[250px] flex-1 space-y-0.5 overflow-y-auto p-1.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                       {attachments.map((file: File, index: number) => {
                         const nameParts = file.name.split('.');
@@ -1362,7 +1365,7 @@ export function EmailComposer({
                             className="group flex items-center justify-between gap-3 rounded-md px-1.5 py-1.5 hover:bg-black/5 dark:hover:bg-white/10"
                           >
                             <div className="flex min-w-0 flex-1 items-center gap-3">
-                              <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded bg-[#F0F0F0] dark:bg-[#2C2C2C]">
+                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-[#F0F0F0] dark:bg-[#2C2C2C]">
                                 {file.type.startsWith('image/') ? (
                                   <img
                                     src={URL.createObjectURL(file)}
@@ -1391,7 +1394,7 @@ export function EmailComposer({
                                 >
                                   <span className="truncate">{truncatedName}</span>
                                   {extension && (
-                                    <span className="ml-0.5 flex-shrink-0 text-[10px] text-[#8C8C8C] dark:text-[#9A9A9A]">
+                                    <span className="ml-0.5 shrink-0 text-[10px] text-[#8C8C8C] dark:text-[#9A9A9A]">
                                       .{extension}
                                     </span>
                                   )}
@@ -1413,7 +1416,7 @@ export function EmailComposer({
                                   toast.error('Failed to remove attachment');
                                 }
                               }}
-                              className="focus-visible:ring-ring ml-1 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-transparent hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2"
+                              className="focus-visible:ring-ring ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-transparent hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2"
                               aria-label={`Remove ${file.name}`}
                             >
                               <XIcon className="text-muted-foreground h-3.5 w-3.5 hover:text-black dark:text-[#9B9B9B] dark:hover:text-white" />
@@ -1514,7 +1517,7 @@ export function EmailComposer({
       </div>
 
       <Dialog open={showLeaveConfirmation} onOpenChange={setShowLeaveConfirmation}>
-        <DialogContent showOverlay className="z-[99999] sm:max-w-[425px]">
+        <DialogContent showOverlay className="z-99999 sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Discard message?</DialogTitle>
             <DialogDescription>
@@ -1534,12 +1537,12 @@ export function EmailComposer({
       </Dialog>
 
       <Dialog open={showAttachmentWarning} onOpenChange={setShowAttachmentWarning}>
-        <DialogContent showOverlay className="z-[99999] sm:max-w-[425px]">
+        <DialogContent showOverlay className="z-99999 sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Attachment Warning</DialogTitle>
             <DialogDescription>
-              Looks like you mentioned an attachment in your message, but there are no files attached.
-              Are you sure you want to send this email?
+              Looks like you mentioned an attachment in your message, but there are no files
+              attached. Are you sure you want to send this email?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="mt-2">
@@ -1622,7 +1625,7 @@ const ContentPreview = ({
     initial="initial"
     animate="animate"
     exit="exit"
-    className="dark:bg-subtleBlack absolute bottom-full right-0 z-30 z-50 w-[400px] overflow-hidden rounded-xl border bg-white p-1 shadow-md"
+    className="dark:bg-subtle-black absolute bottom-full right-0 z-30 z-50 w-[400px] overflow-hidden rounded-xl border bg-white p-1 shadow-md"
   >
     <div
       className="max-h-60 min-h-[150px] overflow-auto rounded-md p-1 text-sm"

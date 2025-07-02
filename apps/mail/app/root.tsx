@@ -79,7 +79,7 @@ export function Layout({ children }: PropsWithChildren) {
         )}
         <Links />
       </head>
-      <body className="antialiased">
+      <body className="scrollbar antialiased">
         <ServerProviders connectionId={connectionId}>
           <ClientProviders>{children}</ClientProviders>
         </ServerProviders>

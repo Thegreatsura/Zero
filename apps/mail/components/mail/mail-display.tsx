@@ -263,7 +263,7 @@ const StreamingText = ({ text }: { text: string }) => {
     <div className="flex items-center gap-2">
       <div
         className={cn(
-          'bg-gradient-to-r from-neutral-500 via-neutral-300 to-neutral-500 bg-[length:200%_100%] bg-clip-text text-sm leading-relaxed text-transparent',
+          'bg-linear-to-r bg-size-[200%_100%] from-neutral-500 via-neutral-300 to-neutral-500 bg-clip-text text-sm leading-relaxed text-transparent',
           isComplete ? 'animate-shine-slow' : '',
         )}
       >
@@ -361,7 +361,7 @@ const MailDisplayLabels = ({ labels }: { labels: string[] }) => {
             <TooltipTrigger>
               <Badge
                 key={`${label}-${index}`}
-                className={`rounded-md p-1 ${bgColor} dark:border-panelDark -ml-1.5 border-2 border-white transition-transform first:ml-0`}
+                className={`rounded-md p-1 ${bgColor} dark:border-panel-dark -ml-1.5 border-2 border-white transition-transform first:ml-0`}
               >
                 {icon}
               </Badge>
@@ -1281,15 +1281,15 @@ const MailDisplay = ({ emailData, index, totalEmails, demo, threadAttachments }:
         <PopoverTrigger asChild>
           <div
             key={person.email}
-            className="dark:bg-panelDark inline-flex items-center justify-start gap-1.5 overflow-hidden rounded-full border bg-white p-1 pr-2"
+            className="dark:bg-panel-dark inline-flex items-center justify-start gap-1.5 overflow-hidden rounded-full border bg-white p-1 pr-2"
           >
             <Avatar className="h-5 w-5">
               <AvatarImage src={getEmailLogo(person.email)} className="rounded-full" />
-              <AvatarFallback className="bg-offsetLight rounded-full text-xs font-bold dark:bg-[#373737]">
+              <AvatarFallback className="bg-offset-light rounded-full text-xs font-bold dark:bg-[#373737]">
                 {getFirstLetterCharacter(person.name || person.email)}
               </AvatarFallback>
             </Avatar>
-            <div className="text-panelDark justify-start text-sm font-medium leading-none dark:text-white">
+            <div className="text-panel-dark justify-start text-sm font-medium leading-none dark:text-white">
               {person.name || person.email}
             </div>
           </div>
@@ -1298,7 +1298,7 @@ const MailDisplay = ({ emailData, index, totalEmails, demo, threadAttachments }:
           <div className="flex items-center gap-2">
             <Avatar className="h-12 w-12">
               <AvatarImage src={getEmailLogo(person.email)} className="rounded-full" />
-              <AvatarFallback className="bg-offsetLight rounded-full text-sm font-bold dark:bg-[#373737]">
+              <AvatarFallback className="bg-offset-light rounded-full text-sm font-bold dark:bg-[#373737]">
                 {getFirstLetterCharacter(person.name || person.email)}
               </AvatarFallback>
             </Avatar>
@@ -1382,11 +1382,11 @@ const MailDisplay = ({ emailData, index, totalEmails, demo, threadAttachments }:
                     <MailDisplayLabels labels={emailData?.tags.map((t) => t.name) || []} />
                   ) : null}
                   {emailData?.tags?.length ? (
-                    <div className="bg-iconLight dark:bg-iconDark/20 relative h-3 w-0.5 rounded-full" />
+                    <div className="bg-icon-light dark:bg-icon-dark/20 relative h-3 w-0.5 rounded-full" />
                   ) : null}
                   <RenderLabels labels={threadLabels} />
                   {threadLabels.length ? (
-                    <div className="bg-iconLight dark:bg-iconDark/20 relative h-3 w-0.5 rounded-full" />
+                    <div className="bg-icon-light dark:bg-icon-dark/20 relative h-3 w-0.5 rounded-full" />
                   ) : null}
                   <div className="text-muted-foreground flex items-center gap-2 text-sm dark:text-[#8C8C8C]">
                     {(() => {
@@ -1470,7 +1470,7 @@ const MailDisplay = ({ emailData, index, totalEmails, demo, threadAttachments }:
                           <Popover open={openDetailsPopover} onOpenChange={handlePopoverChange}>
                             <PopoverTrigger asChild>
                               <button
-                                className="hover:bg-iconLight/10 dark:hover:bg-iconDark/20 flex items-center gap-2 rounded-md p-2"
+                                className="hover:bg-icon-light/10 dark:hover:bg-icon-dark/20 flex items-center gap-2 rounded-md p-2"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   e.preventDefault();
@@ -1484,7 +1484,7 @@ const MailDisplay = ({ emailData, index, totalEmails, demo, threadAttachments }:
                               </button>
                             </PopoverTrigger>
                             <PopoverContent
-                              className="dark:bg-panelDark flex w-[420px] overflow-auto rounded-lg border p-4 text-left shadow-lg"
+                              className="dark:bg-panel-dark flex w-[420px] overflow-auto rounded-lg border p-4 text-left shadow-lg"
                               onBlur={(e) => {
                                 if (!triggerRef.current?.contains(e.relatedTarget)) {
                                   setOpenDetailsPopover(false);
@@ -1617,7 +1617,7 @@ const MailDisplay = ({ emailData, index, totalEmails, demo, threadAttachments }:
                                 }}
                                 className="inline-flex h-7 w-7 items-center justify-center gap-1 overflow-hidden rounded-md bg-white focus:outline-none focus:ring-0 dark:bg-[#313131]"
                               >
-                                <ThreeDots className="fill-iconLight dark:fill-iconDark" />
+                                <ThreeDots className="fill-icon-light dark:fill-icon-dark" />
                               </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="bg-white dark:bg-[#313131]">
@@ -1628,7 +1628,7 @@ const MailDisplay = ({ emailData, index, totalEmails, demo, threadAttachments }:
                                   printMail();
                                 }}
                               >
-                                <Printer className="fill-iconLight dark:fill-iconDark mr-2 h-4 w-4" />
+                                <Printer className="fill-icon-light dark:fill-icon-dark mr-2 h-4 w-4" />
                                 {m['common.mailDisplay.print']()}
                               </DropdownMenuItem>
                               <DropdownMenuItem
@@ -1642,7 +1642,7 @@ const MailDisplay = ({ emailData, index, totalEmails, demo, threadAttachments }:
                                   )();
                                 }}
                               >
-                                <HardDriveDownload className="fill-iconLight dark:text-iconDark dark:fill-iconLight mr-2 h-4 w-4" />
+                                <HardDriveDownload className="fill-icon-light dark:text-icon-dark dark:fill-icon-light mr-2 h-4 w-4" />
                                 Download All Attachments
                               </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -1753,7 +1753,7 @@ const MailDisplay = ({ emailData, index, totalEmails, demo, threadAttachments }:
           <div
             className={cn(
               'h-0 overflow-hidden transition-all duration-200',
-              !isCollapsed && 'h-[1px]',
+              !isCollapsed && 'h-px',
             )}
           ></div>
 
@@ -1794,7 +1794,7 @@ const MailDisplay = ({ emailData, index, totalEmails, demo, threadAttachments }:
                           <HardDriveDownload className="text-muted-foreground dark:text-muted-foreground h-4 w-4 fill-[#FAFAFA] dark:fill-[#262626]" />
                         </button>
                         {index < (emailData?.attachments?.length || 0) - 1 && (
-                          <div className="m-auto h-2 w-[1px] bg-[#E0E0E0] dark:bg-[#424242]" />
+                          <div className="m-auto h-2 w-px bg-[#E0E0E0] dark:bg-[#424242]" />
                         )}
                       </div>
                     ))}

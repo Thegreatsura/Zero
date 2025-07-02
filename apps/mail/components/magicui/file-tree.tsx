@@ -252,7 +252,7 @@ const Folder = forwardRef<HTMLDivElement, FolderProps & React.HTMLAttributes<HTM
         >
           {canExpand ? (
             <Accordion.Trigger
-              className="flex cursor-[ns-resize] items-center"
+              className="flex cursor-ns-resize items-center"
               disabled={!isSelectable}
               onClick={(e) => {
                 e.stopPropagation();

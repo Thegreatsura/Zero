@@ -51,7 +51,7 @@ export function PricingDialog() {
       >
         <DialogTitle className="text-center text-2xl"></DialogTitle>
 
-        <div className="relative inline-flex h-[535px] w-96 flex-col items-center justify-center overflow-hidden rounded-2xl border border-gray-400 bg-zinc-900/50 p-5 outline outline-2 outline-offset-[4px] outline-gray-400 dark:border-[#2D2D2D] dark:outline-[#2D2D2D]">
+        <div className="relative inline-flex h-[535px] w-96 flex-col items-center justify-center overflow-hidden rounded-2xl border border-gray-400 bg-zinc-900/50 p-5 outline outline-2 outline-offset-4 outline-gray-400 dark:border-[#2D2D2D] dark:outline-[#2D2D2D]">
           <div className="absolute inset-0 z-0 h-full w-full overflow-hidden">
             <img
               src="/pricing-gradient.png"
@@ -118,7 +118,7 @@ export function PricingDialog() {
             <div className="flex flex-col items-start justify-start gap-2.5 self-stretch">
               <div className="inline-flex items-center justify-start gap-2.5">
                 <div className="flex h-5 w-5 items-start justify-start gap-3 rounded-[125px] bg-[#1F1F1F] p-[5px] dark:bg-white/10">
-                  <PurpleThickCheck className="relative left-[1px] top-[1px]" />
+                  <PurpleThickCheck className="relative left-px top-px" />
                 </div>
                 <div className="justify-center text-sm font-normal leading-normal text-white lg:text-base">
                   Unlimited email connections
@@ -126,7 +126,7 @@ export function PricingDialog() {
               </div>
               <div className="inline-flex items-center justify-start gap-2.5">
                 <div className="flex h-5 w-5 items-start justify-start gap-3 rounded-[125px] bg-[#1F1F1F] p-[5px] dark:bg-white/10">
-                  <PurpleThickCheck className="relative left-[1px] top-[1px]" />
+                  <PurpleThickCheck className="relative left-px top-px" />
                 </div>
                 <div className="justify-center text-sm font-normal leading-normal text-white lg:text-base">
                   AI-powered chat with your inbox
@@ -134,7 +134,7 @@ export function PricingDialog() {
               </div>
               <div className="inline-flex items-center justify-start gap-2.5">
                 <div className="flex h-5 w-5 items-start justify-start gap-3 rounded-[125px] bg-[#1F1F1F] p-[5px] dark:bg-white/10">
-                  <PurpleThickCheck className="relative left-[1px] top-[1px]" />
+                  <PurpleThickCheck className="relative left-px top-px" />
                 </div>
                 <div className="justify-center text-sm font-normal leading-normal text-white lg:text-base">
                   Auto labeling
@@ -142,7 +142,7 @@ export function PricingDialog() {
               </div>
               <div className="inline-flex items-center justify-start gap-2.5">
                 <div className="flex h-5 w-5 items-start justify-start gap-3 rounded-[125px] bg-[#1F1F1F] p-[5px] dark:bg-white/10">
-                  <PurpleThickCheck className="relative left-[1px] top-[1px]" />
+                  <PurpleThickCheck className="relative left-px top-px" />
                 </div>
                 <div className="justify-center text-sm font-normal leading-normal text-white lg:text-base">
                   One-click AI email writing & replies
@@ -150,7 +150,7 @@ export function PricingDialog() {
               </div>
               <div className="inline-flex items-center justify-start gap-2.5">
                 <div className="flex h-5 w-5 items-start justify-start gap-3 rounded-[125px] bg-[#1F1F1F] p-[5px] dark:bg-white/10">
-                  <PurpleThickCheck className="relative left-[1px] top-[1px]" />
+                  <PurpleThickCheck className="relative left-px top-px" />
                 </div>
                 <div className="justify-center text-sm font-normal leading-normal text-white lg:text-base">
                   Instant thread AI-generated summaries
@@ -158,7 +158,7 @@ export function PricingDialog() {
               </div>
               <div className="inline-flex items-center justify-start gap-2.5">
                 <div className="flex h-5 w-5 items-start justify-start gap-3 rounded-[125px] bg-[#1F1F1F] p-[5px] dark:bg-white/10">
-                  <PurpleThickCheck className="relative left-[1px] top-[1px]" />
+                  <PurpleThickCheck className="relative left-px top-px" />
                 </div>
                 <div className="justify-center text-sm font-normal leading-normal text-white lg:text-base">
                   Priority customer support
@@ -166,7 +166,7 @@ export function PricingDialog() {
               </div>
               <div className="inline-flex items-center justify-start gap-2.5">
                 <div className="flex h-5 w-5 items-start justify-start gap-3 rounded-[125px] bg-[#1F1F1F] p-[5px] dark:bg-white/10">
-                  <PurpleThickCheck className="relative left-[1px] top-[1px]" />
+                  <PurpleThickCheck className="relative left-px top-px" />
                 </div>
                 <div className="justify-center text-sm font-normal leading-normal text-white lg:text-base">
                   Access to private Discord community
@@ -175,7 +175,7 @@ export function PricingDialog() {
             </div>
           </div>
           <button
-            className="z-50 inline-flex h-24 cursor-pointer items-center justify-center gap-2.5 self-stretch overflow-hidden rounded-lg bg-white p-3 outline outline-1 outline-offset-[-1px] outline-gray-400 disabled:cursor-not-allowed disabled:opacity-50 dark:outline-[#2D2D2D]"
+            className="z-50 inline-flex h-24 cursor-pointer items-center justify-center gap-2.5 self-stretch overflow-hidden rounded-lg bg-white p-3 outline outline-1 -outline-offset-1 outline-gray-400 disabled:cursor-not-allowed disabled:opacity-50 dark:outline-[#2D2D2D]"
             onClick={handleUpgrade}
             disabled={isLoading}
           >

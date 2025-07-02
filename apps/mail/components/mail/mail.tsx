@@ -246,7 +246,7 @@ const AutoLabelingSettings = () => {
             <DialogTitle>Label Settings</DialogTitle>
             <button
               onClick={handleToggleAutolabeling}
-              className="bg-offsetLight dark:bg-offsetDark flex items-center gap-2 rounded-lg border px-1.5 py-1"
+              className="bg-offset-light dark:bg-offset-dark flex items-center gap-2 rounded-lg border px-1.5 py-1"
             >
               <span className="text-muted-foreground text-sm">
                 {isEnablingBrain || isDisablingBrain
@@ -331,7 +331,7 @@ const AutoLabelingSettings = () => {
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     setNewLabel({ ...newLabel, name: e.target.value })
                   }
-                  className="h-8 dark:bg-[#141414]"
+                  className="dark:bg-dark-background h-8"
                   placeholder="Enter a new label name"
                 />
               </div>
@@ -348,7 +348,7 @@ const AutoLabelingSettings = () => {
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
                     setNewLabel({ ...newLabel, usecase: e.target.value })
                   }
-                  className="min-h-[60px] resize-none dark:bg-[#141414]"
+                  className="dark:bg-dark-background min-h-[60px] resize-none"
                   placeholder="Describe when this label should be applied..."
                 />
               </div>
@@ -465,7 +465,7 @@ export function MailLayout() {
   return (
     <TooltipProvider delayDuration={0}>
       <PricingDialog />
-      <div className="rounded-inherit relative z-[5] flex p-0 md:mr-0.5 md:mt-1">
+      <div className="rounded-inherit z-5 relative flex p-0 md:mr-0.5 md:mt-1">
         <ResizablePanelGroup
           direction="horizontal"
           autoSaveId="mail-panel-layout"
@@ -476,7 +476,7 @@ export function MailLayout() {
             minSize={35}
             maxSize={35}
             className={cn(
-              `bg-panelLight dark:bg-panelDark mb-1 mr-[3px] w-fit shadow-sm md:rounded-2xl lg:flex lg:h-[calc(100dvh-8px)] lg:shadow-sm`,
+              `bg-panel-light dark:bg-panel-dark mb-1 mr-[3px] w-fit shadow-sm md:rounded-2xl lg:flex lg:h-[calc(100dvh-8px)] lg:shadow-sm`,
               isDesktop && threadId && 'hidden lg:block',
             )}
             onMouseEnter={handleMailListMouseEnter}
@@ -485,7 +485,7 @@ export function MailLayout() {
             <div className="w-full md:h-[calc(100dvh-10px)]">
               <div
                 className={cn(
-                  'sticky top-0 z-[15] flex items-center justify-between gap-1.5 p-2 px-[20px] transition-colors md:min-h-14',
+                  'z-15 sticky top-0 flex items-center justify-between gap-1.5 p-2 px-[20px] transition-colors md:min-h-14',
                 )}
               >
                 <div className="flex w-full items-center justify-between gap-2">
@@ -518,7 +518,7 @@ export function MailLayout() {
                       ) : null}
                     </div>
                     <AutoLabelingSettings />
-                    <div className="dark:bg-iconDark/20 relative ml-2 h-3 w-0.5 rounded-full bg-[#E7E7E7]" />{' '}
+                    <div className="dark:bg-icon-dark/20 relative ml-2 h-3 w-0.5 rounded-full bg-[#E7E7E7]" />{' '}
                     <Button
                       onClick={() => {
                         refetchThreads();
@@ -535,7 +535,7 @@ export function MailLayout() {
                 <Button
                   variant="outline"
                   className={cn(
-                    'text-muted-foreground relative flex h-8 w-full select-none items-center justify-start overflow-hidden rounded-lg border bg-white pl-2 text-left text-sm font-normal shadow-none ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 dark:border-none dark:bg-[#141414]',
+                    'text-muted-foreground dark:bg-dark-background relative flex h-8 w-full select-none items-center justify-start overflow-hidden rounded-lg border bg-white pl-2 text-left text-sm font-normal shadow-none ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 dark:border-none',
                   )}
                   onClick={() => setIsCommandPaletteOpen('true')}
                 >
@@ -571,16 +571,13 @@ export function MailLayout() {
                         Clear
                       </Button>
                     )}
-                    <kbd className="bg-muted text-md pointer-events-none hidden h-7 select-none flex-row items-center gap-1 rounded-md border-none px-2 font-medium !leading-[0] opacity-100 sm:flex dark:bg-[#262626] dark:text-[#929292]">
+                    <kbd className="bg-muted text-md leading-[0]! pointer-events-none hidden h-7 select-none flex-row items-center gap-1 rounded-md border-none px-2 font-medium opacity-100 sm:flex dark:bg-[#262626] dark:text-[#929292]">
                       <span
-                        className={cn(
-                          'h-min !leading-[0.2]',
-                          isMac ? 'mt-[1px] text-lg' : 'text-sm',
-                        )}
+                        className={cn('leading-[0.2]! h-min', isMac ? 'mt-px text-lg' : 'text-sm')}
                       >
                         {isMac ? '⌘' : 'Ctrl'}{' '}
                       </span>
-                      <span className="h-min text-sm !leading-[0.2]"> K</span>
+                      <span className="leading-[0.2]! h-min text-sm"> K</span>
                     </kbd>
                   </span>
                 </Button>
@@ -593,11 +590,11 @@ export function MailLayout() {
               <div
                 className={cn(
                   `${category === 'Important' ? 'bg-[#F59E0D]' : category === 'All Mail' ? 'bg-[#006FFE]' : category === 'Personal' ? 'bg-[#39ae4a]' : category === 'Updates' ? 'bg-[#8B5CF6]' : category === 'Promotions' ? 'bg-[#F43F5E]' : category === 'Unread' ? 'bg-[#FF4800]' : 'bg-[#F59E0D]'}`,
-                  'relative bottom-0.5 z-[5] h-0.5 w-full transition-opacity',
+                  'z-5 relative bottom-0.5 h-0.5 w-full transition-opacity',
                   isFetching ? 'opacity-100' : 'opacity-0',
                 )}
               />
-              <div className="relative z-[1] h-[calc(100dvh-(2px+88px+49px+2px))] overflow-hidden pt-0 md:h-[calc(100dvh-7rem)]">
+              <div className="z-1 relative h-[calc(100dvh-(2px+88px+49px+2px))] overflow-hidden pt-0 md:h-[calc(100dvh-7rem)]">
                 <MailList />
               </div>
             </div>
@@ -608,7 +605,7 @@ export function MailLayout() {
           {isDesktop && (
             <ResizablePanel
               className={cn(
-                'bg-panelLight dark:bg-panelDark mb-1 mr-0.5 w-fit rounded-2xl shadow-sm lg:h-[calc(100dvh-8px)]',
+                'bg-panel-light dark:bg-panel-dark mb-1 mr-0.5 w-fit rounded-2xl shadow-sm lg:h-[calc(100dvh-8px)]',
                 // Only show on md screens and larger when there is a threadId
                 !threadId && 'hidden lg:block',
               )}
@@ -623,7 +620,7 @@ export function MailLayout() {
 
           {/* Mobile Thread View */}
           {isMobile && threadId && (
-            <div className="bg-panelLight dark:bg-panelDark fixed inset-0 z-50">
+            <div className="bg-panel-light dark:bg-panel-dark fixed inset-0 z-50">
               <div className="flex h-full flex-col">
                 <div className="h-full overflow-y-auto outline-none">
                   <ThreadDisplay />

@@ -1,5 +1,3 @@
-import { default as flattenColorPalette } from 'tailwindcss/lib/util/flattenColorPalette';
-import sharedConfig from '../../packages/tailwind-config/tailwind.config';
 import defaultTheme from 'tailwindcss/defaultTheme';
 import scrollbar from 'tailwind-scrollbar';
 import animate from 'tailwindcss-animate';
@@ -7,18 +5,15 @@ import animate from 'tailwindcss-animate';
 import type { Config } from 'tailwindcss';
 
 export default {
-  darkMode: ['class'],
+  darkMode: 'class',
   content: [
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     './app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
-  presets: [sharedConfig],
   theme: {
     extend: {
       colors: {
-        darkBackground: '#141414',
-        lightBackground: '#FFFFFF',
         offsetDark: '#0A0A0A',
         offsetLight: '#F5F5F5',
         panelDark: '#1A1A1A',
@@ -31,8 +26,6 @@ export default {
         subtleBlack: '#1F1F1F',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
-        skyBlue: '#0066FF',
-        shinyGray: '#A1A1A1',
         card: {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
@@ -192,26 +185,5 @@ export default {
       },
     },
   },
-  plugins: [
-    animate,
-    addVariablesForColors,
-    function ({ matchUtilities, theme }: any) {
-      matchUtilities({ values: flattenColorPalette(theme('backgroundColor')), type: 'color' });
-    },
-    scrollbar({
-      nocompatible: true,
-      preferredStrategy: 'pseudoelements',
-    }),
-  ],
+  plugins: [animate, scrollbar],
 } satisfies Config;
-
-function addVariablesForColors({ addBase, theme }: any) {
-  const allColors = flattenColorPalette(theme('colors'));
-  const newVars = Object.fromEntries(
-    Object.entries(allColors).map(([key, val]) => [`--${key}`, val]),
-  );
-
-  addBase({
-    ':root': newVars,
-  });
-}

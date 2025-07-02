@@ -250,7 +250,7 @@ export default function ReplyCompose({ messageId }: ReplyComposeProps) {
     <div className="w-full rounded-xl">
       <EmailComposer
         editorClassName="min-h-[50px]"
-        className="w-full !max-w-none border pb-1"
+        className="w-full max-w-none! border pb-1"
         onSendEmail={handleSendEmail}
         onClose={async () => {
           await setMode(null);
