@@ -55,14 +55,7 @@ import { useQueryState } from 'nuqs';
 import { Badge } from '../ui/badge';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-
-// HTML escaping function to prevent XSS attacks
-function escapeHtml(text: string): string {
-  if (!text) return text;
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
+import { cleanHtml } from '@/lib/email-utils';
 
 // Add formatFileSize utility function
 const formatFileSize = (size: number) => {
@@ -1096,7 +1089,7 @@ const MailDisplay = ({ emailData, index, totalEmails, demo, threadAttachments }:
             <!-- Email Body -->
             <div class="email-body">
               <div class="email-content">
-                ${escapeHtml(emailData?.decodedBody || '') || '<p><em>No email content available</em></p>'}
+                ${cleanHtml(emailData?.decodedBody || '')}
               </div>
             </div>
 
