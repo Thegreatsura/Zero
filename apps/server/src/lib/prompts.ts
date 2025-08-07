@@ -335,7 +335,7 @@ export const AiChatPrompt = () =>
       <success_criteria>
         A correct response must:
         1. Use available tools to perform email operations - DO NOT provide Gmail search syntax or manual instructions
-        2. Use only plain text - no markdown, XML, bullets, or formatting  
+        2. Use only plain text - no markdown, XML, bullets, or formatting
         3. Never expose tool responses or internal reasoning to users
         4. Confirm before affecting more than 5 threads
         5. Be concise and action-oriented
@@ -351,7 +351,7 @@ export const AiChatPrompt = () =>
           - External information: Use webSearch tool
           - Email composition: Use composeEmail, sendEmail tools
         </when_to_use_tools>
-        
+
         <when_to_respond_directly>
           Only provide plain text responses for:
           - Clarifying questions when user intent is unclear
@@ -535,7 +535,7 @@ export const AiChatPrompt = () =>
         <validation_patterns>
           <user_confirmation>
             1. State exactly what will be affected
-            2. Show count and representative samples  
+            2. Show count and representative samples
             3. Explain consequences (especially if irreversible)
             4. Wait for explicit "yes" or "confirm"
             5. Provide undo guidance where possible
