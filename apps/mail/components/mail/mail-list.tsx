@@ -6,7 +6,7 @@ import {
   Trash,
   PencilCompose,
 } from '../icons/icons';
-import { memo, useCallback, useEffect, useMemo, useRef, type ComponentProps } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, type ComponentProps, useState } from 'react';
 import { useOptimisticThreadState } from '@/components/mail/optimistic-thread-state';
 import { focusedIndexAtom, useMailNavigation } from '@/hooks/use-mail-navigation';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -662,6 +662,22 @@ export const MailList = memo(
     const [, setThreadId] = useQueryState('threadId');
     const [, setDraftId] = useQueryState('draftId');
     const [searchValue, setSearchValue] = useSearchValue();
+    const [anchorIndex, setAnchorIndex] = useState<number | null>(null);
+
+    useEffect(() => {
+      const handleKeyDown = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') {
+          setAnchorIndex(null);
+        }
+      };
+
+      window.addEventListener('keydown', handleKeyDown);
+
+      return () => {
+        window.removeEventListener('keydown', handleKeyDown);
+      };
+    }, [setAnchorIndex]);
+
     const [{ refetch, isLoading, isFetching, isFetchingNextPage, hasNextPage }, items, , loadMore] =
       useThreads();
     const trpc = useTRPC();
@@ -703,23 +719,20 @@ export const MailList = memo(
     const getSelectMode = useCallback((): MailSelectMode => {
       const isAltPressed =
         isKeyPressed('Alt') || isKeyPressed('AltLeft') || isKeyPressed('AltRight');
-
       const isShiftPressed =
         isKeyPressed('Shift') || isKeyPressed('ShiftLeft') || isKeyPressed('ShiftRight');
+      const isCtrlPressed = isKeyPressed('Control') || isKeyPressed('Meta');
 
-      if (isKeyPressed('Control') || isKeyPressed('Meta')) {
+      if (isShiftPressed && !isCtrlPressed) {
+        return 'range';
+      }
+      if (isCtrlPressed) {
         return 'mass';
       }
-
       if (isAltPressed && isShiftPressed) {
         console.log('Select All Below mode activated'); // Debug log
         return 'selectAllBelow';
       }
-
-      if (isShiftPressed) {
-        return 'range';
-      }
-
       return 'single';
     }, [isKeyPressed]);
 
@@ -734,6 +747,9 @@ export const MailList = memo(
 
         setMail((prevMail) => {
           const mail = prevMail;
+          const clickedIndex = itemsRef.current.findIndex((item) => item.id === itemId);
+          if (clickedIndex === -1) return mail;
+
           switch (currentMode) {
             case 'mass': {
               const newSelected = mail.bulkSelected.includes(itemId)
@@ -761,8 +777,16 @@ export const MailList = memo(
               return { ...mail, bulkSelected: [itemId] };
             }
             case 'range': {
-              console.log('Range selection mode - not fully implemented');
-              return { ...mail, bulkSelected: [itemId] };
+              console.log('Range selection mode');
+              if (anchorIndex === null) {
+                return { ...mail, bulkSelected: [itemId] };
+              }
+              const start = Math.min(anchorIndex, clickedIndex);
+              const end = Math.max(anchorIndex, clickedIndex);
+              const rangeIds = itemsRef.current.slice(start, end + 1).map((item) => item.id);
+              const newSelected = [...new Set([...mail.bulkSelected, ...rangeIds])];
+              
+              return { ...mail, bulkSelected: newSelected };
             }
             default: {
               console.log('Single selection mode');
@@ -771,7 +795,7 @@ export const MailList = memo(
           }
         });
       },
-      [getSelectMode, setMail],
+      [getSelectMode, setMail, anchorIndex],
     );
 
     const [, setFocusedIndex] = useAtom(focusedIndexAtom);
@@ -784,6 +808,11 @@ export const MailList = memo(
         console.log('Mail click with mode:', mode);
 
         if (mode !== 'single') {
+          const messageThreadId = message.threadId ?? message.id;
+          const clickedIndex = itemsRef.current.findIndex((item) => item.id === messageThreadId);
+          if (clickedIndex !== -1 && mode !== 'range') {
+            setAnchorIndex(clickedIndex);
+          }
           return handleSelectMail(message);
         }
 
