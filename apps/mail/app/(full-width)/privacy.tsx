@@ -21,7 +21,7 @@ export default function PrivacyPolicy() {
   return (
     <div className="relative flex min-h-screen w-full flex-col overflow-auto bg-white dark:bg-[#111111]">
       <Navigation />
-      <div className="relative z-10 flex flex-grow flex-col">
+      <div className="relative z-10 flex grow flex-col">
         <div className="absolute right-4 top-6 md:left-8 md:right-auto md:top-8">
           <a href="/">
             <Button
@@ -61,7 +61,7 @@ export default function PrivacyPolicy() {
                       </h2>
                       <button
                         onClick={() => handleCopyLink(sectionId)}
-                        className="text-gray-400 transition-all hover:text-gray-700 dark:text-white/60 dark:hover:text-white/80"
+                        className="text-gray-400 hover:text-gray-700 dark:text-white/60 dark:hover:text-white/80"
                         aria-label={`Copy link to ${section.title} section`}
                       >
                         <Link2

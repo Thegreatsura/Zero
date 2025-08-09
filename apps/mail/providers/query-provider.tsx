@@ -53,7 +53,7 @@ export const makeQueryClient = (connectionId: string | null) =>
         retry: false,
         refetchOnWindowFocus: false,
         queryKeyHashFn: (queryKey) => hashKey([{ connectionId }, ...queryKey]),
-        gcTime: 1000 * 60 * 1,
+        gcTime: 1000 * 60 * 1 * 1, // 60 minutes, we're storing in DOs,
       },
       mutations: {
         onError: (err) => console.error(err.message),
@@ -97,7 +97,10 @@ export const trpcClient = createTRPCClient<AppRouter>({
         fetch(url, { ...options, credentials: 'include' }).then((res) => {
           const currentPath = new URL(window.location.href).pathname;
           const redirectPath = res.headers.get('X-Zero-Redirect');
-          if (!!redirectPath && redirectPath !== currentPath) window.location.href = redirectPath;
+          if (!!redirectPath && redirectPath !== currentPath) {
+            window.location.href = redirectPath;
+            res.headers.delete('X-Zero-Redirect');
+          }
           return res;
         }),
     }),
@@ -120,7 +123,7 @@ export function QueryProvider({
       persistOptions={{
         persister,
         buster: CACHE_BURST_KEY,
-        maxAge: 1000 * 60 * 1, // 1 minute, we're storing in DOs,
+        maxAge: 1000 * 60 * 1 * 1, // 60 minutes, we're storing in DOs,
       }}
     >
       <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>

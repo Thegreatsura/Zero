@@ -217,6 +217,7 @@ export interface DeleteAllSpamResponse {
 }
 
 export enum Tools {
+  GetThreadSummary = 'getThreadSummary',
   GetThread = 'getThread',
   ComposeEmail = 'composeEmail',
   DeleteEmail = 'deleteEmail',
@@ -234,6 +235,7 @@ export enum Tools {
   WebSearch = 'webSearch',
   InboxRag = 'inboxRag',
   BuildGmailSearchQuery = 'buildGmailSearchQuery',
+  GetCurrentDate = 'getCurrentDate',
 }
 
 export type AppContext = Context<{ Bindings: Env }>;
@@ -245,4 +247,11 @@ export enum EPrompts {
   Chat = 'Chat',
   Compose = 'Compose',
   //   ThreadLabels = 'ThreadLabels'
+}
+
+export interface IEmailSendBatch {
+  messageId: string;
+  connectionId: string;
+  mail?: IOutgoingMessage & { draftId?: string };
+  sendAt?: number;
 }

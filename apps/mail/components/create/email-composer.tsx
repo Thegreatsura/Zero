@@ -18,14 +18,12 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/
 import { Check, Command, Loader, Paperclip, Plus, Type, X as XIcon } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { TextEffect } from '@/components/motion-primitives/text-effect';
-import { ImageCompressionSettings } from './image-compression-settings';
+import { ScheduleSendPicker } from './schedule-send-picker';
 import { useActiveConnection } from '@/hooks/use-connections';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useEmailAliases } from '@/hooks/use-email-aliases';
-import type { ImageQuality } from '@/lib/image-compression';
 import useComposeEditor from '@/hooks/use-compose-editor';
 import { CurvedArrow, Sparkles, X } from '../icons/icons';
-import { compressImages } from '@/lib/image-compression';
 import { gitHubEmojis } from '@tiptap/extension-emoji';
 import { AnimatePresence, motion } from 'motion/react';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -46,7 +44,12 @@ import { Toolbar } from './toolbar';
 import pluralize from 'pluralize';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { ImageCompressionSettings } from './image-compression-settings';
+import { compressImages } from '@/lib/image-compression';
+import type { ImageQuality } from '@/lib/image-compression';
+
 const shortcodeRegex = /:([a-zA-Z0-9_+-]+):/g;
+import { TemplateButton } from './template-button';
 
 type ThreadContent = {
   from: string;
@@ -72,6 +75,7 @@ interface EmailComposerProps {
     message: string;
     attachments: File[];
     fromEmail?: string;
+    scheduleAt?: string;
   }) => Promise<void>;
   onClose?: () => void;
   className?: string;
@@ -144,6 +148,8 @@ export function EmailComposer({
   const bccWrapperRef = useRef<HTMLDivElement>(null);
   const { data: activeConnection } = useActiveConnection();
   const [showLeaveConfirmation, setShowLeaveConfirmation] = useState(false);
+  const [scheduleAt, setScheduleAt] = useState<string>();
+  const [isScheduleValid, setIsScheduleValid] = useState<boolean>(true);
   const [showAttachmentWarning, setShowAttachmentWarning] = useState(false);
   const [originalAttachments, setOriginalAttachments] = useState<File[]>(initialAttachments);
   const [imageQuality, setImageQuality] = useState<ImageQuality>(
@@ -462,6 +468,11 @@ export function EmailComposer({
         return;
       }
 
+      if (!isScheduleValid) {
+        toast.error('Please choose a valid date & time for scheduling');
+        return;
+      }
+
       setIsLoading(true);
       setAiGeneratedMessage(null);
       // Save draft before sending, we want to send drafts instead of sending new emails
@@ -475,6 +486,7 @@ export function EmailComposer({
         message: editor.getHTML(),
         attachments: values.attachments || [],
         fromEmail: values.fromEmail,
+        scheduleAt,
       });
       setHasUnsavedChanges(false);
       editor.commands.clearContent(true);
@@ -691,6 +703,14 @@ export function EmailComposer({
     setImageQuality(newQuality);
     await processAndSetAttachments(originalAttachments, newQuality, true);
   };
+
+  const handleScheduleChange = useCallback((value?: string) => {
+    setScheduleAt(value);
+  }, []);
+
+  const handleScheduleValidityChange = useCallback((valid: boolean) => {
+    setIsScheduleValid(valid);
+  }, []);
 
   const replaceEmojiShortcodes = (text: string): string => {
     if (!text.trim().length || !text.includes(':')) return text;
@@ -1269,7 +1289,7 @@ export function EmailComposer({
               <SelectTrigger className="h-6 flex-1 border-0 bg-transparent p-0 text-sm font-normal text-black placeholder:text-[#797979] focus:outline-none focus:ring-0 dark:text-white/90">
                 <SelectValue placeholder="Select an email address" />
               </SelectTrigger>
-              <SelectContent className="z-[99999]">
+              <SelectContent className="z-99999">
                 {aliases.map((alias) => (
                   <SelectItem key={alias.email} value={alias.email}>
                     <div className="flex flex-row items-center gap-1">
@@ -1307,7 +1327,7 @@ export function EmailComposer({
         <div className="flex flex-col items-start justify-start gap-2">
           {toggleToolbar && <Toolbar editor={editor} />}
           <div className="flex items-center justify-start gap-2">
-            <Button size={'xs'} onClick={handleSend} disabled={isLoading || settingsLoading}>
+            <Button size={'xs'} onClick={handleSend} disabled={isLoading || settingsLoading || !isScheduleValid}>
               <div className="flex items-center justify-center">
                 <div className="text-center text-sm leading-none text-white dark:text-black">
                   <span>Send </span>
@@ -1318,10 +1338,24 @@ export function EmailComposer({
                 <CurvedArrow className="mt-1.5 h-4 w-4 fill-white dark:fill-black" />
               </div>
             </Button>
+            <ScheduleSendPicker
+              value={scheduleAt}
+              onChange={handleScheduleChange}
+              onValidityChange={handleScheduleValidityChange}
+            />
             <Button variant={'secondary'} size={'xs'} onClick={() => fileInputRef.current?.click()}>
               <Plus className="h-3 w-3 fill-[#9A9A9A]" />
               <span className="hidden px-0.5 text-sm md:block">Add</span>
             </Button>
+            <TemplateButton
+              editor={editor}
+              subject={subjectInput}
+              setSubject={(value) => setValue('subject', value)}
+              to={toEmails}
+              cc={ccEmails ?? []}
+              bcc={bccEmails ?? []}
+              setRecipients={(field, val) => setValue(field, val)}
+            />
             <Input
               type="file"
               id="attachment-input"
@@ -1349,7 +1383,7 @@ export function EmailComposer({
                   </button>
                 </PopoverTrigger>
                 <PopoverContent
-                  className="z-[100] w-[340px] rounded-lg p-0 shadow-lg dark:bg-[#202020]"
+                  className="z-100 w-[340px] rounded-lg p-0 shadow-lg dark:bg-[#202020]"
                   align="start"
                   sideOffset={6}
                 >
@@ -1387,7 +1421,7 @@ export function EmailComposer({
                             className="group flex items-center justify-between gap-3 rounded-md px-1.5 py-1.5 hover:bg-black/5 dark:hover:bg-white/10"
                           >
                             <div className="flex min-w-0 flex-1 items-center gap-3">
-                              <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded bg-[#F0F0F0] dark:bg-[#2C2C2C]">
+                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-[#F0F0F0] dark:bg-[#2C2C2C]">
                                 {file.type.startsWith('image/') ? (
                                   <img
                                     src={URL.createObjectURL(file)}
@@ -1416,7 +1450,7 @@ export function EmailComposer({
                                 >
                                   <span className="truncate">{truncatedName}</span>
                                   {extension && (
-                                    <span className="ml-0.5 flex-shrink-0 text-[10px] text-[#8C8C8C] dark:text-[#9A9A9A]">
+                                    <span className="ml-0.5 shrink-0 text-[10px] text-[#8C8C8C] dark:text-[#9A9A9A]">
                                       .{extension}
                                     </span>
                                   )}
@@ -1438,7 +1472,7 @@ export function EmailComposer({
                                   toast.error('Failed to remove attachment');
                                 }
                               }}
-                              className="focus-visible:ring-ring ml-1 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-transparent hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2"
+                              className="focus-visible:ring-ring ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-transparent hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2"
                               aria-label={`Remove ${file.name}`}
                             >
                               <XIcon className="text-muted-foreground h-3.5 w-3.5 hover:text-black dark:text-[#9B9B9B] dark:hover:text-white" />
@@ -1521,42 +1555,11 @@ export function EmailComposer({
               </div>
             </Button>
           </div>
-          {/* <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  disabled
-                  className="hidden h-7 items-center gap-0.5 overflow-hidden rounded-md bg-white/5 px-1.5 shadow-sm hover:bg-white/10 disabled:opacity-50 md:flex"
-                >
-                  <Smile className="h-3 w-3 fill-[#9A9A9A]" />
-                  <span className="px-0.5 text-sm">Casual</span>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Coming soon...</p>
-              </TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  disabled
-                  className="flex h-7 items-center gap-0.5 overflow-hidden rounded-md bg-white/5 px-1.5 shadow-sm hover:bg-white/10 disabled:opacity-50 md:flex"
-                >
-                  {messageLength < 50 && <ShortStack className="h-3 w-3 fill-[#9A9A9A]" />}
-                  {messageLength >= 50 && messageLength < 200 && (
-                    <MediumStack className="h-3 w-3 fill-[#9A9A9A]" />
-                  )}
-                  {messageLength >= 200 && <LongStack className="h-3 w-3 fill-[#9A9A9A]" />}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Coming soon...</p>
-              </TooltipContent>
-            </Tooltip> */}
         </div>
       </div>
 
       <Dialog open={showLeaveConfirmation} onOpenChange={setShowLeaveConfirmation}>
-        <DialogContent showOverlay className="z-[99999] sm:max-w-[425px]">
+        <DialogContent showOverlay className="z-99999 sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Discard message?</DialogTitle>
             <DialogDescription>
@@ -1576,7 +1579,7 @@ export function EmailComposer({
       </Dialog>
 
       <Dialog open={showAttachmentWarning} onOpenChange={setShowAttachmentWarning}>
-        <DialogContent showOverlay className="z-[99999] sm:max-w-[425px]">
+        <DialogContent showOverlay className="z-99999 sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Attachment Warning</DialogTitle>
             <DialogDescription>

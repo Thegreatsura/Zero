@@ -416,7 +416,7 @@
       "signatures": "Paraksti",
       "shortcuts": "Īsceļi",
       "labels": "Iezīmes",
-      "categories": "Kategorijas",
+      "categories": "Skati",
       "dangerZone": "Bīstamā zona",
       "deleteAccount": "Dzēst kontu",
       "privacy": "Privātums"
@@ -448,11 +448,15 @@
         "noResultsFound": "Netika atrasts neviens rezultāts",
         "zeroSignature": "Zero paraksts",
         "zeroSignatureDescription": "Pievienot Zero parakstu saviem e-pastiem.",
+        "undoSendEnabled": "Atsaukt nosūtīšanu",
+        "undoSendEnabledDescription": "Ļaut atcelt e-pastus 30 sekunžu laikā pēc nosūtīšanas.",
         "defaultEmailAlias": "Noklusējuma e-pasta aizstājvārds",
         "selectDefaultEmail": "Izvēlieties noklusējuma e-pastu",
         "defaultEmailDescription": "Šis e-pasts tiks izmantots kā noklusējuma 'No' adrese, rakstot jaunus e-pastus",
         "autoRead": "Automātiska lasīšana",
-        "autoReadDescription": "Automātiski atzīmēt e-pastus kā izlasītus, kad uz tiem uzklikšķināt."
+        "autoReadDescription": "Automātiski atzīmēt e-pastus kā izlasītus, kad uz tiem uzklikšķināt.",
+        "animations": "Animācijas",
+        "animationsDescription": "Iespējot plūstošas animācijas, pārslēdzoties starp e-pastiem"
       },
       "connections": {
         "title": "E-pasta savienojumi",

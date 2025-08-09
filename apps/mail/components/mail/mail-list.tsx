@@ -6,7 +6,7 @@ import {
   Trash,
   PencilCompose,
 } from '../icons/icons';
-import { memo, useCallback, useEffect, useMemo, useRef, type ComponentProps } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, type ComponentProps, useState } from 'react';
 import { useOptimisticThreadState } from '@/components/mail/optimistic-thread-state';
 import { focusedIndexAtom, useMailNavigation } from '@/hooks/use-mail-navigation';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -22,13 +22,9 @@ import { useSearchValue } from '@/hooks/use-search-value';
 import { EmptyStateIcon } from '../icons/empty-state-svg';
 import { highlightText } from '@/lib/email-utils.client';
 import { cn, FOLDERS, formatDate } from '@/lib/utils';
-import { Avatar } from '../ui/avatar';
-
 import { useTRPC } from '@/providers/query-provider';
 import { useThreadLabels } from '@/hooks/use-labels';
-
 import { useSettings } from '@/hooks/use-settings';
-
 import { useKeyState } from '@/hooks/use-hot-key';
 import { VList, type VListHandle } from 'virtua';
 import { BimiAvatar } from '../ui/bimi-avatar';
@@ -37,13 +33,11 @@ import { Badge } from '@/components/ui/badge';
 import { useDraft } from '@/hooks/use-drafts';
 import { Check, Star } from 'lucide-react';
 import { Skeleton } from '../ui/skeleton';
-
 import { m } from '@/paraglide/messages';
 import { useParams } from 'react-router';
-
 import { Button } from '../ui/button';
+import { Avatar } from '../ui/avatar';
 import { useQueryState } from 'nuqs';
-import { Categories } from './mail';
 import { useAtom } from 'jotai';
 
 const Thread = memo(
@@ -218,18 +212,18 @@ const Thread = memo(
         <div
           className={cn('select-none border-b md:my-1 md:border-none')}
           onClick={onClick ? onClick(latestMessage) : undefined}
-          onMouseEnter={() => {
-            window.dispatchEvent(new CustomEvent('emailHover', { detail: { id: idToUse } }));
-          }}
-          onMouseLeave={() => {
-            window.dispatchEvent(new CustomEvent('emailHover', { detail: { id: null } }));
-          }}
+          //   onMouseEnter={() => {
+          //     window.dispatchEvent(new CustomEvent('emailHover', { detail: { id: idToUse } }));
+          //   }}
+          //   onMouseLeave={() => {
+          //     window.dispatchEvent(new CustomEvent('emailHover', { detail: { id: null } }));
+          //   }}
         >
           <div
             data-thread-id={idToUse}
             key={idToUse}
             className={cn(
-              'hover:bg-offsetLight hover:bg-primary/5 group relative mx-1 flex cursor-pointer flex-col items-start rounded-lg py-2 text-left text-sm transition-all hover:opacity-100',
+              'hover:bg-offsetLight dark:hover:bg-primary/5 group relative mx-1 flex cursor-pointer flex-col items-start rounded-lg py-2 text-left text-sm hover:opacity-100',
               (isMailSelected || isMailBulkSelected || isKeyboardFocused) &&
                 'border-border bg-primary/5 opacity-100',
               isKeyboardFocused && 'ring-primary/50',
@@ -239,7 +233,7 @@ const Thread = memo(
           >
             <div
               className={cn(
-                'dark:bg-panelDark absolute right-2 z-[25] flex -translate-y-1/2 items-center gap-1 rounded-xl border bg-white p-1 opacity-0 shadow-sm group-hover:opacity-100',
+                'dark:bg-panelDark z-25 absolute right-2 flex -translate-y-1/2 items-center gap-1 rounded-xl border bg-white p-1 opacity-0 shadow-sm group-hover:opacity-100',
                 index === 0 ? 'top-4' : 'top-[-1]',
               )}
             >
@@ -578,7 +572,7 @@ const Draft = memo(({ message }: { message: { id: string } }) => {
         <div
           key={message.id}
           className={cn(
-            'group relative mx-[8px] flex cursor-pointer flex-col items-start overflow-clip rounded-[10px] border-transparent py-3 text-left text-sm transition-all',
+            'group relative mx-[8px] flex cursor-pointer flex-col items-start overflow-clip rounded-[10px] border-transparent py-3 text-left text-sm',
           )}
         >
           <div
@@ -610,7 +604,7 @@ const Draft = memo(({ message }: { message: { id: string } }) => {
       <div
         key={message.id}
         className={cn(
-          'hover:bg-offsetLight hover:bg-primary/5 group relative mx-[8px] flex cursor-pointer flex-col items-start overflow-clip rounded-[10px] border-transparent py-3 text-left text-sm transition-all hover:opacity-100',
+          'hover:bg-offsetLight dark:hover:bg-primary/5 group relative mx-[8px] flex cursor-pointer flex-col items-start overflow-clip rounded-[10px] border-transparent py-3 text-left text-sm hover:opacity-100',
         )}
       >
         <div
@@ -667,8 +661,23 @@ export const MailList = memo(
     const { data: settingsData } = useSettings();
     const [, setThreadId] = useQueryState('threadId');
     const [, setDraftId] = useQueryState('draftId');
-    const [category, setCategory] = useQueryState('category');
     const [searchValue, setSearchValue] = useSearchValue();
+    const [anchorIndex, setAnchorIndex] = useState<number | null>(null);
+
+    useEffect(() => {
+      const handleKeyDown = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') {
+          setAnchorIndex(null);
+        }
+      };
+
+      window.addEventListener('keydown', handleKeyDown);
+
+      return () => {
+        window.removeEventListener('keydown', handleKeyDown);
+      };
+    }, [setAnchorIndex]);
+
     const [{ refetch, isLoading, isFetching, isFetchingNextPage, hasNextPage }, items, , loadMore] =
       useThreads();
     const trpc = useTRPC();
@@ -680,28 +689,6 @@ export const MailList = memo(
     useEffect(() => {
       itemsRef.current = items;
     }, [items]);
-
-    const allCategories = Categories();
-
-    // Skip category filtering for drafts, spam, sent, archive, and bin pages
-    const shouldFilter = !['draft', 'spam', 'sent', 'archive', 'bin'].includes(folder || '');
-
-    // Set initial category search value only if not in special folders
-    useEffect(() => {
-      if (!shouldFilter) return;
-
-      const currentCategory = category
-        ? allCategories.find((cat) => cat.id === category)
-        : allCategories.find((cat) => cat.id === 'All Mail');
-
-      if (currentCategory && searchValue.value === '') {
-        setSearchValue({
-          value: currentCategory.searchValue || '',
-          highlight: '',
-          folder: '',
-        });
-      }
-    }, [allCategories, category, shouldFilter, searchValue.value, setSearchValue]);
 
     // Add event listener for refresh
     useEffect(() => {
@@ -732,23 +719,20 @@ export const MailList = memo(
     const getSelectMode = useCallback((): MailSelectMode => {
       const isAltPressed =
         isKeyPressed('Alt') || isKeyPressed('AltLeft') || isKeyPressed('AltRight');
-
       const isShiftPressed =
         isKeyPressed('Shift') || isKeyPressed('ShiftLeft') || isKeyPressed('ShiftRight');
+      const isCtrlPressed = isKeyPressed('Control') || isKeyPressed('Meta');
 
-      if (isKeyPressed('Control') || isKeyPressed('Meta')) {
+      if (isShiftPressed && !isCtrlPressed) {
+        return 'range';
+      }
+      if (isCtrlPressed) {
         return 'mass';
       }
-
       if (isAltPressed && isShiftPressed) {
         console.log('Select All Below mode activated'); // Debug log
         return 'selectAllBelow';
       }
-
-      if (isShiftPressed) {
-        return 'range';
-      }
-
       return 'single';
     }, [isKeyPressed]);
 
@@ -763,6 +747,9 @@ export const MailList = memo(
 
         setMail((prevMail) => {
           const mail = prevMail;
+          const clickedIndex = itemsRef.current.findIndex((item) => item.id === itemId);
+          if (clickedIndex === -1) return mail;
+
           switch (currentMode) {
             case 'mass': {
               const newSelected = mail.bulkSelected.includes(itemId)
@@ -790,8 +777,16 @@ export const MailList = memo(
               return { ...mail, bulkSelected: [itemId] };
             }
             case 'range': {
-              console.log('Range selection mode - not fully implemented');
-              return { ...mail, bulkSelected: [itemId] };
+              console.log('Range selection mode');
+              if (anchorIndex === null) {
+                return { ...mail, bulkSelected: [itemId] };
+              }
+              const start = Math.min(anchorIndex, clickedIndex);
+              const end = Math.max(anchorIndex, clickedIndex);
+              const rangeIds = itemsRef.current.slice(start, end + 1).map((item) => item.id);
+              const newSelected = [...new Set([...mail.bulkSelected, ...rangeIds])];
+              
+              return { ...mail, bulkSelected: newSelected };
             }
             default: {
               console.log('Single selection mode');
@@ -800,7 +795,7 @@ export const MailList = memo(
           }
         });
       },
-      [getSelectMode, setMail],
+      [getSelectMode, setMail, anchorIndex],
     );
 
     const [, setFocusedIndex] = useAtom(focusedIndexAtom);
@@ -813,6 +808,11 @@ export const MailList = memo(
         console.log('Mail click with mode:', mode);
 
         if (mode !== 'single') {
+          const messageThreadId = message.threadId ?? message.id;
+          const clickedIndex = itemsRef.current.findIndex((item) => item.id === messageThreadId);
+          if (clickedIndex !== -1 && mode !== 'range') {
+            setAnchorIndex(clickedIndex);
+          }
           return handleSelectMail(message);
         }
 
@@ -851,7 +851,6 @@ export const MailList = memo(
     }, [isLoading, isFiltering, setSearchValue]);
 
     const clearFilters = () => {
-      setCategory(null);
       setSearchValue({
         value: '',
         highlight: '',

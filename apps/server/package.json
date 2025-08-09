@@ -12,7 +12,8 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "eval": "evalite",
-    "eval:dev": "evalite watch"
+    "eval:dev": "evalite watch",
+    "test:cron": "curl 'http://localhost:8787/cdn-cgi/handler/scheduled'"
   },
   "exports": {
     "./trpc": "./src/trpc/index.ts",
@@ -30,6 +31,7 @@
     "@arcadeai/arcadejs": "1.8.1",
     "@barkleapp/css-sanitizer": "1.0.0",
     "@coinbase/cookie-manager": "1.1.8",
+    "@dub/better-auth": "0.0.3",
     "@googleapis/gmail": "12.0.0",
     "@googleapis/people": "3.0.9",
     "@hono/trpc-server": "^0.3.4",
@@ -38,6 +40,7 @@
     "@modelcontextprotocol/sdk": "1.15.1",
     "@react-email/components": "^0.0.41",
     "@react-email/render": "1.1.0",
+    "@sentry/cloudflare": "9.43.0",
     "@trpc/client": "catalog:",
     "@trpc/server": "catalog:",
     "@tsndr/cloudflare-worker-jwt": "3.2.0",
@@ -49,9 +52,12 @@
     "base64-js": "1.5.1",
     "better-auth": "catalog:",
     "cheerio": "1.1.0",
+    "cloudflare": "4.5.0",
     "date-fns": "^4.1.0",
     "dedent": "^1.6.0",
+    "dormroom": "1.0.1",
     "drizzle-orm": "catalog:",
+    "dub": "0.64.2",
     "effect": "3.16.12",
     "elevenlabs": "1.59.0",
     "email-addresses": "^5.0.0",
@@ -74,11 +80,13 @@
     "string-strip-html": "^13.4.12",
     "superjson": "catalog:",
     "twilio": "5.7.0",
+    "ulid": "3.0.1",
     "uuid": "11.1.0",
     "wrangler": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@effect/language-service": "0.31.1",
     "@types/he": "1.2.3",
     "@types/node": "^22.9.0",
     "@types/react": "19.1.6",

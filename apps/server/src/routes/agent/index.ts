@@ -15,6 +15,15 @@
  */
 
 import {
+  countThreads,
+  countThreadsByLabels,
+  deleteSpamThreads,
+  get,
+  getThreadLabels,
+  modifyThreadLabels,
+  type DB,
+} from './db';
+import {
   appendResponseMessages,
   createDataStreamResponse,
   generateText,
@@ -34,76 +43,539 @@ import {
   type ParsedMessage,
 } from '../../types';
 import type { IGetThreadResponse, IGetThreadsResponse, MailManager } from '../../lib/driver/types';
+import { generateWhatUserCaresAbout, type UserTopic } from '../../lib/analyze/interests';
 import { DurableObjectOAuthClientProvider } from 'agents/mcp/do-oauth-client-provider';
 import { AiChatPrompt, GmailSearchAssistantSystemPrompt } from '../../lib/prompts';
 import { connectionToDriver, getZeroSocketAgent } from '../../lib/server-utils';
+import { Migratable, Queryable, Transfer } from 'dormroom';
 import type { CreateDraftData } from '../../lib/schemas';
-import { withRetry } from '../../lib/gmail-rate-limit';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { getPrompt } from '../../pipelines.effect';
 import { AIChatAgent } from 'agents/ai-chat-agent';
+import { DurableObject } from 'cloudflare:workers';
 import { ToolOrchestrator } from './orchestrator';
+import migrations from './db/drizzle/migrations';
 import { getPromptName } from '../../pipelines';
 import { anthropic } from '@ai-sdk/anthropic';
 import { connection } from '../../db/schema';
 import type { WSMessage } from 'partyserver';
 import { tools as authTools } from './tools';
 import { processToolCalls } from './utils';
-import { env } from 'cloudflare:workers';
-import type { Connection } from 'agents';
+import { type ZeroEnv } from '../../env';
+import { type Connection } from 'agents';
 import { openai } from '@ai-sdk/openai';
+import * as schema from './db/schema';
+import { threads } from './db/schema';
+import { Effect, pipe } from 'effect';
+import { groq } from '@ai-sdk/groq';
 import { createDb } from '../../db';
-import { DriverRpcDO } from './rpc';
+import type { Message } from 'ai';
 import { eq } from 'drizzle-orm';
-
-import { Effect } from 'effect';
+import { create } from './db';
 
 const decoder = new TextDecoder();
-
-const shouldDropTables = false;
 const maxCount = 20;
-const shouldLoop = env.THREAD_SYNC_LOOP !== 'false';
-export class ZeroDriver extends AIChatAgent<typeof env> {
-  private foldersInSync: Map<string, boolean> = new Map();
+
+// Error types for getUserTopics
+export class StorageError extends Error {
+  readonly _tag = 'StorageError';
+  constructor(message: string, cause?: unknown) {
+    super(message);
+    this.name = 'StorageError';
+    this.cause = cause;
+  }
+}
+
+export class LabelRetrievalError extends Error {
+  readonly _tag = 'LabelRetrievalError';
+  constructor(message: string, cause?: unknown) {
+    super(message);
+    this.name = 'LabelRetrievalError';
+    this.cause = cause;
+  }
+}
+
+export class TopicGenerationError extends Error {
+  readonly _tag = 'TopicGenerationError';
+  constructor(message: string, cause?: unknown) {
+    super(message);
+    this.name = 'TopicGenerationError';
+    this.cause = cause;
+  }
+}
+
+export class LabelCreationError extends Error {
+  readonly _tag = 'LabelCreationError';
+  constructor(message: string, cause?: unknown) {
+    super(message);
+    this.name = 'LabelCreationError';
+    this.cause = cause;
+  }
+}
+
+export class BroadcastError extends Error {
+  readonly _tag = 'BroadcastError';
+  constructor(message: string, cause?: unknown) {
+    super(message);
+    this.name = 'BroadcastError';
+    this.cause = cause;
+  }
+}
+
+// Error types for syncThread
+export class ThreadSyncError extends Error {
+  readonly _tag = 'ThreadSyncError';
+  constructor(message: string, cause?: unknown) {
+    super(message);
+    this.name = 'ThreadSyncError';
+    this.cause = cause;
+  }
+}
+
+export class DriverUnavailableError extends Error {
+  readonly _tag = 'DriverUnavailableError';
+  constructor(message: string, cause?: unknown) {
+    super(message);
+    this.name = 'DriverUnavailableError';
+    this.cause = cause;
+  }
+}
+
+export class ThreadDataError extends Error {
+  readonly _tag = 'ThreadDataError';
+  constructor(message: string, cause?: unknown) {
+    super(message);
+    this.name = 'ThreadDataError';
+    this.cause = cause;
+  }
+}
+
+export class DateNormalizationError extends Error {
+  readonly _tag = 'DateNormalizationError';
+  constructor(message: string, cause?: unknown) {
+    super(message);
+    this.name = 'DateNormalizationError';
+    this.cause = cause;
+  }
+}
+
+// Error types for syncThreads
+export class FolderSyncError extends Error {
+  readonly _tag = 'FolderSyncError';
+  constructor(message: string, cause?: unknown) {
+    super(message);
+    this.name = 'FolderSyncError';
+    this.cause = cause;
+  }
+}
+
+export class ThreadListError extends Error {
+  readonly _tag = 'ThreadListError';
+  constructor(message: string, cause?: unknown) {
+    super(message);
+    this.name = 'ThreadListError';
+    this.cause = cause;
+  }
+}
+
+export class ConcurrencyError extends Error {
+  readonly _tag = 'ConcurrencyError';
+  constructor(message: string, cause?: unknown) {
+    super(message);
+    this.name = 'ConcurrencyError';
+    this.cause = cause;
+  }
+}
+
+// Union type for all possible errors
+export type TopicGenerationErrors =
+  | StorageError
+  | LabelRetrievalError
+  | TopicGenerationError
+  | LabelCreationError
+  | BroadcastError;
+
+export type ThreadSyncErrors =
+  | ThreadSyncError
+  | DriverUnavailableError
+  | ThreadDataError
+  | DateNormalizationError;
+
+export type FolderSyncErrors =
+  | FolderSyncError
+  | DriverUnavailableError
+  | ThreadListError
+  | ConcurrencyError;
+
+// Success cases and result types
+export interface TopicGenerationResult {
+  topics: UserTopic[];
+  cacheHit: boolean;
+  cacheAge?: number;
+  subjectsAnalyzed: number;
+  existingLabelsCount: number;
+  labelsCreated: number;
+  broadcastSent: boolean;
+}
+
+export interface ThreadSyncResult {
+  success: boolean;
+  threadId: string;
+  threadData?: IGetThreadResponse;
+  reason?: string;
+  normalizedReceivedOn?: string;
+  broadcastSent: boolean;
+}
+
+export interface FolderSyncResult {
+  synced: number;
+  message: string;
+  folder: string;
+  pagesProcessed: number;
+  totalThreads: number;
+  successfulSyncs: number;
+  failedSyncs: number;
+  broadcastSent: boolean;
+}
+
+export interface CachedTopics {
+  topics: UserTopic[];
+  timestamp: number;
+}
+
+// Requirements interface
+export interface TopicGenerationRequirements {
+  readonly storage: DurableObjectStorage;
+  readonly agent?: DurableObjectStub<ZeroAgent>;
+  readonly connectionId: string;
+}
+
+export interface ThreadSyncRequirements {
+  readonly driver: MailManager;
+  readonly agent?: DurableObjectStub<ZeroAgent>;
+  readonly connectionId: string;
+}
+
+export interface FolderSyncRequirements {
+  readonly driver: MailManager;
+  readonly agent?: DurableObjectStub<ZeroAgent>;
+  readonly connectionId: string;
+}
+
+// Constants
+export const TOPIC_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+export const TOPIC_CACHE_KEY = 'user_topics';
+
+// Type aliases for better readability
+export type TopicGenerationEffect = Effect.Effect<
+  TopicGenerationResult,
+  TopicGenerationErrors,
+  TopicGenerationRequirements
+>;
+export type TopicGenerationSuccess = TopicGenerationResult;
+export type TopicGenerationFailure = TopicGenerationErrors;
+
+export type ThreadSyncEffect = Effect.Effect<
+  ThreadSyncResult,
+  ThreadSyncErrors,
+  ThreadSyncRequirements
+>;
+export type ThreadSyncSuccess = ThreadSyncResult;
+export type ThreadSyncFailure = ThreadSyncErrors;
+
+export type FolderSyncEffect = Effect.Effect<
+  FolderSyncResult,
+  FolderSyncErrors,
+  FolderSyncRequirements
+>;
+export type FolderSyncSuccess = FolderSyncResult;
+export type FolderSyncFailure = FolderSyncErrors;
+
+const _migrations = Object.fromEntries(
+  Object.entries(migrations.migrations).map(([_, value], index) => [index + 1, [value]]),
+);
+
+@Migratable({
+  migrations: {
+    1: [
+      `CREATE TABLE IF NOT EXISTS shards (  
+      shard_id TEXT PRIMARY KEY,  
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  
+      last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP  
+    )`,
+    ],
+  },
+})
+@Queryable()
+export class ShardRegistry extends DurableObject<ZeroEnv> {
+  sql: SqlStorage;
+  constructor(ctx: DurableObjectState, env: ZeroEnv) {
+    super(ctx, env);
+    this.sql = ctx.storage.sql;
+  }
+}
+
+@Migratable({
+  migrations: _migrations,
+})
+@Queryable()
+export class ZeroDriver extends DurableObject<ZeroEnv> {
+  transfer = new Transfer(this);
+  sql: SqlStorage;
+  private db: DB;
   private syncThreadsInProgress: Map<string, boolean> = new Map();
   private driver: MailManager | null = null;
   private agent: DurableObjectStub<ZeroAgent> | null = null;
-  constructor(ctx: DurableObjectState, env: Env) {
+  private name: string = 'general';
+  private connection: typeof connection.$inferSelect | null = null;
+  constructor(ctx: DurableObjectState, env: ZeroEnv) {
     super(ctx, env);
-    if (shouldDropTables) this.dropTables();
-    void this.sql`
-        CREATE TABLE IF NOT EXISTS threads (
-            id TEXT PRIMARY KEY,
-            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            thread_id TEXT NOT NULL,
-            provider_id TEXT NOT NULL,
-            latest_sender TEXT,
-            latest_received_on TEXT,
-            latest_subject TEXT,
-            latest_label_ids TEXT,
-            categories TEXT
+    this.sql = ctx.storage.sql;
+    this.db = drizzle(ctx.storage, { schema });
+  }
+
+  async setName(name: string) {
+    this.name = name;
+    await this.ctx.blockConcurrencyWhile(async () => {
+      await this.setupAuth();
+    });
+  }
+
+  getDatabaseSize() {
+    return this.ctx.storage.sql.databaseSize;
+  }
+
+  async isSyncing(): Promise<boolean> {
+    return false;
+  }
+
+  async getAllSubjects() {
+    const subjects = await this.db.select({ latestSubject: threads.latestSubject }).from(threads);
+    return subjects.map((row) => row.latestSubject).filter((subject) => subject !== null);
+  }
+
+  broadcast(message: OutgoingMessage) {
+    this.agent?.broadcastChatMessage(message);
+  }
+
+  async getUserTopics(): Promise<UserTopic[]> {
+    // Create the Effect with proper types - no external requirements needed
+    const topicGenerationEffect = Effect.gen(this, function* () {
+      console.log(`[getUserTopics] Starting topic generation for connection: ${this.name}`);
+
+      const result: TopicGenerationResult = {
+        topics: [],
+        cacheHit: false,
+        subjectsAnalyzed: 0,
+        existingLabelsCount: 0,
+        labelsCreated: 0,
+        broadcastSent: false,
+      };
+
+      // Check storage first
+      const stored = yield* Effect.tryPromise(() => this.ctx.storage.get(TOPIC_CACHE_KEY)).pipe(
+        Effect.tap(() =>
+          Effect.sync(() => console.log(`[getUserTopics] Checking storage for cached topics`)),
+        ),
+        Effect.catchAll((error) => {
+          console.warn(`[getUserTopics] Failed to get cached topics from storage:`, error);
+          return Effect.succeed(null);
+        }),
+      );
+
+      if (stored) {
+        // Type guard to ensure stored is a valid CachedTopics object
+        const isValidCachedTopics = (data: unknown): data is CachedTopics => {
+          return (
+            typeof data === 'object' &&
+            data !== null &&
+            'topics' in data &&
+            'timestamp' in data &&
+            Array.isArray((data as any).topics) &&
+            typeof (data as any).timestamp === 'number'
+          );
+        };
+
+        const cachedTopicsResult = yield* Effect.try({
+          try: () => {
+            if (!isValidCachedTopics(stored)) {
+              throw new Error('Invalid cached data format');
+            }
+            return stored as CachedTopics;
+          },
+          catch: (error) => new Error(`Invalid cached data: ${error}`),
+        }).pipe(
+          Effect.catchAll((error) => {
+            console.warn(`[getUserTopics] Invalid cached data, regenerating:`, error);
+            return Effect.succeed(null);
+          }),
         );
-    `;
-  }
 
-  async setMetaData(connectionId: string) {
-    await this.setName(connectionId);
-    this.agent = await getZeroSocketAgent(connectionId);
-    return new DriverRpcDO(this, connectionId);
-  }
+        if (cachedTopicsResult) {
+          const cacheAge = Date.now() - cachedTopicsResult.timestamp;
 
-  async markAsRead(threadIds: string[]) {
-    if (!this.driver) {
-      throw new Error('No driver available');
-    }
-    return await this.driver.markAsRead(threadIds);
-  }
+          if (cacheAge < TOPIC_CACHE_TTL) {
+            console.log(
+              `[getUserTopics] Using cached topics (age: ${Math.round(cacheAge / 1000 / 60)} minutes)`,
+            );
+            result.topics = cachedTopicsResult.topics;
+            result.cacheHit = true;
+            result.cacheAge = cacheAge;
+            return result;
+          } else {
+            console.log(
+              `[getUserTopics] Cache expired (age: ${Math.round(cacheAge / 1000 / 60)} minutes), regenerating`,
+            );
+          }
+        }
+      }
 
-  async markAsUnread(threadIds: string[]) {
-    if (!this.driver) {
-      throw new Error('No driver available');
-    }
-    return await this.driver.markAsUnread(threadIds);
+      // Generate new topics
+      console.log(`[getUserTopics] Generating new topics`);
+      const subjects = yield* Effect.tryPromise(() => this.getAllSubjects()).pipe(
+        Effect.catchAll((error) => {
+          console.error(`[getUserTopics] Failed to get subjects:`, error);
+          return Effect.succeed([]);
+        }),
+      );
+      result.subjectsAnalyzed = subjects.length;
+      console.log(`[getUserTopics] Found ${subjects.length} subjects for analysis`);
+
+      let existingLabels: { name: string; id: string }[] = [];
+
+      const existingLabelsResult = yield* Effect.tryPromise(() => this.getUserLabels()).pipe(
+        Effect.tap((labels) =>
+          Effect.sync(() => {
+            result.existingLabelsCount = labels.length;
+            console.log(`[getUserTopics] Retrieved ${labels.length} existing labels`);
+          }),
+        ),
+        Effect.catchAll((error) => {
+          console.warn(
+            `[getUserTopics] Failed to get existing labels for topic generation:`,
+            error,
+          );
+          return Effect.succeed([]);
+        }),
+      );
+
+      existingLabels = existingLabelsResult;
+
+      const topics = yield* Effect.tryPromise(() =>
+        generateWhatUserCaresAbout(subjects, { existingLabels }),
+      ).pipe(
+        Effect.tap((topics) =>
+          Effect.sync(() => {
+            result.topics = topics;
+            console.log(
+              `[getUserTopics] Generated ${topics.length} topics:`,
+              topics.map((t) => t.topic),
+            );
+          }),
+        ),
+        Effect.catchAll((error) => {
+          console.error(`[getUserTopics] Failed to generate topics:`, error);
+          return Effect.succeed([]);
+        }),
+      );
+
+      if (topics.length > 0) {
+        console.log(`[getUserTopics] Processing ${topics.length} topics`);
+
+        // Ensure labels exist in user account
+        yield* Effect.tryPromise(async () => {
+          try {
+            const existingLabelNames = new Set(
+              existingLabels.map((label) => label.name.toLowerCase()),
+            );
+            let createdCount = 0;
+
+            for (const topic of topics) {
+              const topicName = topic.topic.toLowerCase();
+              if (!existingLabelNames.has(topicName)) {
+                console.log(`[getUserTopics] Creating label for topic: ${topic.topic}`);
+                await this.createLabel({
+                  name: topic.topic,
+                });
+                createdCount++;
+              }
+            }
+            result.labelsCreated = createdCount;
+            console.log(`[getUserTopics] Created ${createdCount} new labels`);
+          } catch (error) {
+            console.error(`[getUserTopics] Failed to ensure topic labels exist:`, error);
+            throw error;
+          }
+        }).pipe(
+          Effect.catchAll((error) => {
+            console.error(`[getUserTopics] Error creating labels:`, error);
+            return Effect.succeed(undefined);
+          }),
+        );
+
+        // Store the result
+        yield* Effect.tryPromise(() =>
+          this.ctx.storage.put(TOPIC_CACHE_KEY, {
+            topics,
+            timestamp: Date.now(),
+          }),
+        ).pipe(
+          Effect.tap(() =>
+            Effect.sync(() => console.log(`[getUserTopics] Stored topics in cache`)),
+          ),
+          Effect.catchAll((error) => {
+            console.error(`[getUserTopics] Failed to store topics in cache:`, error);
+            return Effect.succeed(undefined);
+          }),
+        );
+
+        // Broadcast message if agent exists
+        if (this.agent) {
+          yield* Effect.tryPromise(() =>
+            this.agent!.broadcastChatMessage({
+              type: OutgoingMessageType.User_Topics,
+            }),
+          ).pipe(
+            Effect.tap(() =>
+              Effect.sync(() => {
+                result.broadcastSent = true;
+                console.log(`[getUserTopics] Broadcasted topics update`);
+              }),
+            ),
+            Effect.catchAll((error) => {
+              console.warn(`[getUserTopics] Failed to broadcast topics update:`, error);
+              return Effect.succeed(undefined);
+            }),
+          );
+        } else {
+          console.log(`[getUserTopics] No agent available for broadcasting`);
+        }
+      } else {
+        console.log(`[getUserTopics] No topics generated`);
+      }
+
+      console.log(`[getUserTopics] Completed topic generation for connection: ${this.name}`, {
+        topicsCount: result.topics.length,
+        cacheHit: result.cacheHit,
+        subjectsAnalyzed: result.subjectsAnalyzed,
+        existingLabelsCount: result.existingLabelsCount,
+        labelsCreated: result.labelsCreated,
+        broadcastSent: result.broadcastSent,
+      });
+
+      return result;
+    });
+
+    // Run the Effect and extract just the topics for backward compatibility
+    return Effect.runPromise(
+      topicGenerationEffect.pipe(
+        Effect.map((result) => result.topics),
+        Effect.catchAll((error) => {
+          console.error(`[getUserTopics] Critical error in getUserTopics:`, error);
+          return Effect.succeed([]);
+        }),
+      ),
+    );
   }
 
   async normalizeIds(ids: string[]) {
@@ -135,10 +607,7 @@ export class ZeroDriver extends AIChatAgent<typeof env> {
   }
 
   async deleteAllSpam() {
-    if (!this.driver) {
-      throw new Error('No driver available');
-    }
-    return await this.driver.deleteAllSpam();
+    return await deleteSpamThreads(this.db);
   }
 
   async getEmailAliases() {
@@ -155,24 +624,65 @@ export class ZeroDriver extends AIChatAgent<typeof env> {
     return await this.driver.getMessageAttachments(messageId);
   }
 
-  async onConnect() {
-    if (!this.driver) await this.setupAuth();
+  private dropTables() {
+    this.sql.exec(`DROP TABLE IF EXISTS threads`);
+    this.sql.exec(`DROP TABLE IF EXISTS thread_labels`);
+    this.sql.exec(`DROP TABLE IF EXISTS labels`);
+  }
+
+  private createTables() {
+    const m = Object.values(migrations.migrations);
+    for (const migration of m) {
+      this.sql.exec(migration);
+    }
+  }
+
+  async forceReSync() {
+    // this.foldersInSync.clear();
+    this.syncThreadsInProgress.clear();
+    this.dropTables();
+    this.createTables();
+    await this.syncFolders();
   }
 
   public async setupAuth() {
     if (this.name === 'general') return;
     if (!this.driver) {
-      const { db, conn } = createDb(env.HYPERDRIVE.connectionString);
+      const { db, conn } = createDb(this.env.HYPERDRIVE.connectionString);
       const _connection = await db.query.connection.findFirst({
         where: eq(connection.id, this.name),
       });
-      if (_connection) this.driver = connectionToDriver(_connection);
+      if (_connection) {
+        this.driver = connectionToDriver(_connection);
+        this.connection = _connection;
+      }
       this.ctx.waitUntil(conn.end());
-      this.ctx.waitUntil(this.syncThreads('inbox'));
-      this.ctx.waitUntil(this.syncThreads('sent'));
-      this.ctx.waitUntil(this.syncThreads('spam'));
+    }
+    if (!this.agent) this.agent = await getZeroSocketAgent(this.name);
+  }
+
+  async syncFolders() {
+    if (this.name === 'general') return;
+    // Skip sync for aggregate instances - they should only mirror primary operations
+    // The multi-stub pattern ensures aggregate gets operations in background
+    if (this.name.includes('aggregate')) {
+      console.log('[syncFolders] Skipping sync for aggregate instance');
+      return;
+    }
+
+    const threadCount = await this.getThreadCount();
+    if (threadCount < maxCount) {
+      console.log(
+        `[syncFolders] Starting folder sync for ${this.name} (threadCount: ${threadCount})`,
+      );
+      await this.triggerSyncWorkflow('inbox');
+    } else {
+      console.log(
+        `[syncFolders] Skipping sync for ${this.name} - threadCount (${threadCount}) >= maxCount (${maxCount})`,
+      );
     }
   }
+
   async rawListThreads(params: {
     folder: string;
     query?: string;
@@ -186,32 +696,32 @@ export class ZeroDriver extends AIChatAgent<typeof env> {
     return await this.driver.list(params);
   }
 
-  async getThread(threadId: string) {
+  async getThread(threadId: string, includeDrafts: boolean = false) {
     if (!this.driver) {
       throw new Error('No driver available');
     }
-    return await this.getThreadFromDB(threadId);
+    return await this.getThreadFromDB(threadId, includeDrafts);
   }
 
-  async markThreadsRead(threadIds: string[]) {
-    if (!this.driver) {
-      throw new Error('No driver available');
-    }
-    return await this.driver.modifyLabels(threadIds, {
-      addLabels: [],
-      removeLabels: ['UNREAD'],
-    });
-  }
+  //   async markThreadsRead(threadIds: string[]) {
+  //     if (!this.driver) {
+  //       throw new Error('No driver available');
+  //     }
+  //     return await this.driver.modifyLabels(threadIds, {
+  //       addLabels: [],
+  //       removeLabels: ['UNREAD'],
+  //     });
+  //   }
 
-  async markThreadsUnread(threadIds: string[]) {
-    if (!this.driver) {
-      throw new Error('No driver available');
-    }
-    return await this.driver.modifyLabels(threadIds, {
-      addLabels: ['UNREAD'],
-      removeLabels: [],
-    });
-  }
+  //   async markThreadsUnread(threadIds: string[]) {
+  //     if (!this.driver) {
+  //       throw new Error('No driver available');
+  //     }
+  //     return await this.driver.modifyLabels(threadIds, {
+  //       addLabels: ['UNREAD'],
+  //       removeLabels: [],
+  //     });
+  //   }
 
   async modifyLabels(threadIds: string[], addLabelIds: string[], removeLabelIds: string[]) {
     if (!this.driver) {
@@ -317,253 +827,166 @@ export class ZeroDriver extends AIChatAgent<typeof env> {
 
   // Additional mail operations
   async count() {
-    if (!this.driver) {
-      throw new Error('No driver available');
-    }
-    return await this.driver.count();
-  }
-
-  private async listWithRetry(params: Parameters<MailManager['list']>[0]) {
-    if (!this.driver) throw new Error('No driver available');
-
-    return Effect.runPromise(withRetry(Effect.tryPromise(() => this.driver!.list(params))));
-  }
-
-  private async getWithRetry(threadId: string): Promise<IGetThreadResponse> {
-    if (!this.driver) throw new Error('No driver available');
-
-    return Effect.runPromise(withRetry(Effect.tryPromise(() => this.driver!.get(threadId))));
+    const folders = ['inbox', 'sent', 'spam', 'archive', 'trash'];
+    const results = await countThreadsByLabels(
+      this.db,
+      folders.map((f) => f.toUpperCase()),
+    );
+    const resultMap = new Map(
+      results.map((r: { labelId: string; count: number }) => [r.labelId, r.count]),
+    );
+    return folders.map((f) => ({ label: f, count: resultMap.get(f.toUpperCase()) ?? 0 }));
   }
 
   private getThreadKey(threadId: string) {
     return `${this.name}/${threadId}.json`;
   }
 
-  async *streamThreads(folder: string) {
-    let pageToken: string | null = null;
-    let hasMore = true;
-
-    while (hasMore) {
-      // Rate limiting delay
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      const result = await this.listWithRetry({
-        folder,
-        maxResults: maxCount, // Smaller batches for streaming
-        pageToken: pageToken || undefined,
-      });
-
-      // Stream each thread individually
-      for (const thread of result.threads) {
-        yield thread;
-      }
-
-      pageToken = result.nextPageToken;
-      hasMore = pageToken !== null && shouldLoop;
-    }
-  }
-
-  async dropTables() {
-    return this.sql`
-        DROP TABLE IF EXISTS threads;`;
-  }
-
-  async deleteThread(id: string) {
-    void this.sql`
-      DELETE FROM threads WHERE thread_id = ${id};
-    `;
+  async reloadFolder(folder: string) {
     this.agent?.broadcastChatMessage({
       type: OutgoingMessageType.Mail_List,
-      folder: 'bin',
+      folder,
     });
   }
 
-  async syncThread({ threadId }: { threadId: string }) {
-    if (this.name === 'general') return;
-    if (!this.driver) {
-      await this.setupAuth();
-    }
-
-    if (!this.driver) {
-      console.error('No driver available for syncThread');
-      throw new Error('No driver available');
+  async syncThread({ threadId }: { threadId: string }): Promise<ThreadSyncResult> {
+    if (this.name === 'general' || this.name.includes('aggregate')) {
+      console.log(`[syncThread] Skipping sync for ${this.name} instance - thread ${threadId}`);
+      return { success: true, threadId, broadcastSent: false };
     }
 
     if (this.syncThreadsInProgress.has(threadId)) {
-      console.log(`Sync already in progress for thread ${threadId}, skipping...`);
-      return;
+      console.log(`[syncThread] Sync already in progress for thread ${threadId}, skipping...`);
+      return { success: true, threadId, broadcastSent: false };
     }
-    this.syncThreadsInProgress.set(threadId, true);
 
-    // console.log('Server: syncThread called for thread', threadId);
-    try {
-      const threadData = await this.getWithRetry(threadId);
-      const latest = threadData.latest;
+    return Effect.runPromise(
+      Effect.gen(this, function* () {
+        console.log(`[syncThread] Starting sync for thread: ${threadId}`);
+        if (!this.connection) {
+          throw new Error('No connection available');
+        }
+        const result: ThreadSyncResult = {
+          success: false,
+          threadId,
+          broadcastSent: false,
+        };
 
-      if (latest) {
-        // Convert receivedOn to ISO format for proper sorting
-        let normalizedReceivedOn: string;
-        try {
-          normalizedReceivedOn = new Date(latest.receivedOn).toISOString();
-        } catch (error) {
-          console.log('Here!', error);
-          normalizedReceivedOn = new Date().toISOString();
+        this.syncThreadsInProgress.set(threadId, true);
+
+        const latest = yield* Effect.tryPromise(() =>
+          this.env.THREAD_SYNC_WORKER.get(this.env.THREAD_SYNC_WORKER.newUniqueId()).syncThread(
+            this.connection!,
+            threadId,
+          ),
+        );
+
+        if (!latest) {
+          this.syncThreadsInProgress.delete(threadId);
+          console.log(`[syncThread] Skipping thread ${threadId} - no latest message`);
+          result.success = false;
+          result.reason = 'No latest message';
+          return result;
         }
 
-        await env.THREADS_BUCKET.put(this.getThreadKey(threadId), JSON.stringify(threadData), {
-          customMetadata: {
-            threadId,
-          },
+        // Normalize received date
+        const normalizedReceivedOn = yield* Effect.try({
+          try: () => new Date(latest.receivedOn).toISOString(),
+          catch: (error) =>
+            new DateNormalizationError(`Failed to normalize date for ${threadId}`, error),
+        }).pipe(
+          Effect.catchAll((error) => {
+            console.warn(
+              `[syncThread] Date normalization failed for ${threadId}, using current date:`,
+              error,
+            );
+            return Effect.succeed(new Date().toISOString());
+          }),
+        );
+
+        result.normalizedReceivedOn = normalizedReceivedOn;
+
+        // Update database
+        yield* Effect.tryPromise(() =>
+          create(
+            this.db,
+            {
+              id: threadId,
+              threadId,
+              providerId: 'google',
+              latestSender: latest.sender,
+              latestReceivedOn: normalizedReceivedOn,
+              latestSubject: latest.subject,
+            },
+            latest.tags.map((tag) => tag.id),
+          ),
+        ).pipe(
+          Effect.tap(() =>
+            Effect.sync(() => console.log(`[syncThread] Updated database for ${threadId}`)),
+          ),
+          Effect.tap(() => Effect.sync(() => this.reloadFolder('inbox'))),
+          Effect.catchAll((error) => {
+            console.error(`[syncThread] Failed to update database for ${threadId}:`, error);
+            return Effect.succeed(undefined);
+          }),
+        );
+
+        // Broadcast update if agent exists
+        if (this.agent) {
+          yield* Effect.tryPromise(() =>
+            this.agent!.broadcastChatMessage({
+              type: OutgoingMessageType.Mail_Get,
+              threadId,
+            }),
+          ).pipe(
+            Effect.tap(() =>
+              Effect.sync(() => {
+                result.broadcastSent = true;
+                console.log(`[syncThread] Broadcasted update for ${threadId}`);
+              }),
+            ),
+            Effect.catchAll((error) => {
+              console.warn(`[syncThread] Failed to broadcast update for ${threadId}:`, error);
+              return Effect.succeed(undefined);
+            }),
+          );
+        } else {
+          console.log(`[syncThread] No agent available for broadcasting ${threadId}`);
+        }
+
+        this.syncThreadsInProgress.delete(threadId);
+
+        result.success = true;
+
+        console.log(`[syncThread] Completed sync for thread: ${threadId}`, {
+          success: result.success,
+          broadcastSent: result.broadcastSent,
+          hasLatestMessage: !!latest,
         });
 
-        void this.sql`
-      INSERT OR REPLACE INTO threads (
-        id,
-        thread_id,
-        provider_id,
-        latest_sender,
-        latest_received_on,
-        latest_subject,
-        latest_label_ids,
-        updated_at
-      ) VALUES (
-        ${threadId},
-        ${threadId},
-        'google',
-        ${JSON.stringify(latest.sender)},
-        ${normalizedReceivedOn},
-        ${latest.subject},
-        ${JSON.stringify(latest.tags.map((tag) => tag.id))},
-        CURRENT_TIMESTAMP
-      )
-    `;
-        if (this.agent)
-          this.agent.broadcastChatMessage({
-            type: OutgoingMessageType.Mail_Get,
+        return result;
+      }).pipe(
+        Effect.catchAll((error) => {
+          this.syncThreadsInProgress.delete(threadId);
+          console.error(`[syncThread] Critical error syncing thread ${threadId}:`, error);
+          return Effect.succeed({
+            success: false,
             threadId,
+            reason: error.message,
+            broadcastSent: false,
           });
-        this.syncThreadsInProgress.delete(threadId);
-        // console.log('Server: syncThread result', {
-        //   threadId,
-        //   labels: threadData.labels,
-        // });
-        return { success: true, threadId, threadData };
-      } else {
-        this.syncThreadsInProgress.delete(threadId);
-        console.log(`Skipping thread ${threadId} - no latest message`);
-        return { success: false, threadId, reason: 'No latest message' };
-      }
-    } catch (error) {
-      this.syncThreadsInProgress.delete(threadId);
-      console.error(`Failed to sync thread ${threadId}:`, error);
-      throw error;
-    }
+        }),
+      ),
+    );
   }
 
   async getThreadCount() {
-    const count = this.sql`SELECT COUNT(*) FROM threads`;
-    return count[0]['COUNT(*)'] as number;
-  }
-
-  async getFolderThreadCount(folder: string) {
-    const count = this.sql`SELECT COUNT(*) FROM threads WHERE EXISTS (
-      SELECT 1 FROM json_each(latest_label_ids) WHERE value = ${folder}
-    )`;
-    return count[0]['COUNT(*)'] as number;
-  }
-
-  async syncThreads(folder: string) {
-    if (!this.driver) {
-      console.error('No driver available for syncThreads');
-      throw new Error('No driver available');
-    }
-
-    if (this.foldersInSync.has(folder)) {
-      console.log('Sync already in progress, skipping...');
-      return { synced: 0, message: 'Sync already in progress' };
-    }
-
-    const threadCount = await this.getThreadCount();
-    if (threadCount >= maxCount && !shouldLoop) {
-      console.log('Threads already synced, skipping...');
-      return { synced: 0, message: 'Threads already synced' };
-    }
-
-    this.foldersInSync.set(folder, true);
-
-    const self = this;
-
-    const syncSingleThread = (threadId: string) =>
-      Effect.gen(function* () {
-        yield* Effect.sleep(500); // Rate limiting delay
-        return yield* withRetry(Effect.tryPromise(() => self.syncThread({ threadId })));
-      }).pipe(
-        Effect.catchAll((error) => {
-          console.error(`Failed to sync thread ${threadId}:`, error);
-          return Effect.succeed(null);
-        }),
-      );
-
-    const syncProgram = Effect.gen(
-      function* () {
-        let totalSynced = 0;
-        let pageToken: string | null = null;
-        let hasMore = true;
-        // let _pageCount = 0;
-
-        while (hasMore) {
-          // _pageCount++;
-
-          // Rate limiting delay between pages
-          yield* Effect.sleep(2000);
-
-          const result: IGetThreadsResponse = yield* Effect.tryPromise(() =>
-            self.listWithRetry({
-              folder,
-              maxResults: maxCount,
-              pageToken: pageToken || undefined,
-            }),
-          );
-
-          // Process threads with controlled concurrency to avoid rate limits
-          const threadIds = result.threads.map((thread) => thread.id);
-          const syncEffects = threadIds.map(syncSingleThread);
-
-          yield* Effect.all(syncEffects, { concurrency: 1, discard: true });
-
-          totalSynced += result.threads.length;
-          pageToken = result.nextPageToken;
-          hasMore = pageToken !== null && shouldLoop;
-        }
-
-        return { synced: totalSynced };
-      }.bind(this),
-    );
-
-    try {
-      const result = await Effect.runPromise(
-        syncProgram.pipe(
-          Effect.ensuring(
-            Effect.sync(() => {
-              console.log('Setting isSyncing to false');
-              this.foldersInSync.delete(folder);
-              this.agent?.broadcastChatMessage({
-                type: OutgoingMessageType.Mail_List,
-                folder,
-              });
-            }),
-          ),
-        ),
-      );
-      return result;
-    } catch (error) {
-      console.error('Failed to sync inbox threads:', error);
-      throw error;
-    }
+    const count = await countThreads(this.db);
+    return count || 0;
   }
 
   async inboxRag(query: string) {
-    if (!env.AUTORAG_ID) {
+    if (!this.env.AUTORAG_ID) {
       console.warn('[inboxRag] AUTORAG_ID not configured - RAG search disabled');
       return { result: 'Not enabled', data: [] };
     }
@@ -576,7 +999,7 @@ export class ZeroDriver extends AIChatAgent<typeof env> {
         folder_filter: `${this.name}/`,
       });
 
-      const answer = await env.AI.autorag(env.AUTORAG_ID).aiSearch({
+      const answer = await this.env.AI.autorag(this.env.AUTORAG_ID).aiSearch({
         query: query,
         //   rewrite_query: true,
         max_num_results: 3,
@@ -627,7 +1050,7 @@ export class ZeroDriver extends AIChatAgent<typeof env> {
 
     const genQueryEffect = Effect.tryPromise(() =>
       generateText({
-        model: openai(env.OPENAI_MODEL || 'gpt-4o'),
+        model: openai(this.env.OPENAI_MODEL || 'gpt-4o'),
         system: GmailSearchAssistantSystemPrompt(),
         prompt: params.query,
       }).then((response) => response.text),
@@ -645,21 +1068,29 @@ export class ZeroDriver extends AIChatAgent<typeof env> {
       }).then((r) => r.threads.map((t) => t.id)),
     ).pipe(Effect.catchAll(() => Effect.succeed([])));
 
+    const effects: Effect.Effect<string[]>[] = [rawEffect];
+    if (this.env.AUTORAG_ID) effects.unshift(ragEffect as Effect.Effect<string[]>);
+
     // Run both in parallel and wait for results
-    const results = await Effect.runPromise(
-      Effect.all([ragEffect, rawEffect], { concurrency: 'unbounded' }),
-    );
+    const results = await Effect.runPromise(Effect.all(effects, { concurrency: 'unbounded' }));
+    if (this.env.AUTORAG_ID) {
+      const [ragIds, rawIds] = results;
 
-    const [ragIds, rawIds] = results;
+      // Return InboxRag results if found, otherwise fallback to raw
+      if (ragIds.length > 0) {
+        return {
+          threadIds: ragIds,
+          source: 'autorag' as const,
+        };
+      }
 
-    // Return InboxRag results if found, otherwise fallback to raw
-    if (ragIds.length > 0) {
       return {
-        threadIds: ragIds,
-        source: 'autorag' as const,
+        threadIds: rawIds,
+        source: 'raw' as const,
+        nextPageToken: pageToken,
       };
     }
-
+    const [rawIds] = results;
     return {
       threadIds: rawIds,
       source: 'raw' as const,
@@ -672,6 +1103,123 @@ export class ZeroDriver extends AIChatAgent<typeof env> {
     return folderName;
   }
 
+  private queryThreads(params: {
+    labelIds?: string[];
+    folder?: string;
+    q?: string;
+    pageToken?: string;
+    maxResults: number;
+  }) {
+    return Effect.tryPromise(async () => {
+      const { labelIds = [], folder, q, pageToken, maxResults } = params;
+
+      console.log('[queryThreads] params:', { labelIds, folder, q, pageToken, maxResults });
+
+      // Import the new database functions
+      const {
+        findThreadsWithPagination,
+        findThreadsByFolderWithPagination,
+        findThreadsByFolder,
+        findThreadsWithAnyLabels,
+        findThreadsWithTextSearch,
+        list,
+      } = await import('./db');
+
+      // Case 1: All threads (no filters)
+      if (!folder && labelIds.length === 0 && !q && !pageToken) {
+        console.log('[queryThreads] Case: all threads');
+        const threads = await list(this.db);
+        return threads.map((thread: any) => ({
+          id: thread.id,
+          latest_received_on: thread.latestReceivedOn,
+        }));
+      }
+
+      // Case 2: Folder only
+      if (folder && labelIds.length === 0 && !q) {
+        const folderLabel = folder.toUpperCase();
+        console.log('[queryThreads] Case: folder only', { folderLabel });
+
+        if (pageToken) {
+          const result = await findThreadsByFolderWithPagination(this.db, folderLabel, {
+            pageToken,
+            maxResults,
+          });
+          return result.threads.map((thread: any) => ({
+            id: thread.id,
+            latest_received_on: thread.latestReceivedOn,
+          }));
+        } else {
+          const threads = await findThreadsByFolder(this.db, folderLabel);
+          return threads.slice(0, maxResults).map((thread: any) => ({
+            id: thread.id,
+            latest_received_on: thread.latestReceivedOn,
+          }));
+        }
+      }
+
+      // Case 3: Single label only
+      if (labelIds.length === 1 && !folder && !q) {
+        const labelId = labelIds[0];
+        console.log('[queryThreads] Case: single label only', { labelId });
+
+        if (pageToken) {
+          const result = await findThreadsWithPagination(this.db, {
+            labelIds: [labelId],
+            pageToken,
+            maxResults,
+          });
+          return result.threads.map((thread: any) => ({
+            id: thread.id,
+            latest_received_on: thread.latestReceivedOn,
+          }));
+        } else {
+          const threads = await findThreadsWithAnyLabels(this.db, [labelId]);
+          return threads.slice(0, maxResults).map((thread: any) => ({
+            id: thread.id,
+            latest_received_on: thread.latestReceivedOn,
+          }));
+        }
+      }
+
+      // Case 4: Text search only
+      if (q && !folder && labelIds.length === 0) {
+        console.log('[queryThreads] Case: text search only', { q });
+        const threads = await findThreadsWithTextSearch(this.db, q);
+        return threads.slice(0, maxResults).map((thread: any) => ({
+          id: thread.id,
+          latest_received_on: thread.latestReceivedOn,
+        }));
+      }
+
+      // Case 5: Complex filtering (folder + labels + search + pagination)
+      console.log('[queryThreads] Case: complex filtering', {
+        folder,
+        labelIds,
+        q,
+        pageToken,
+      });
+
+      const allLabelIds = [...labelIds];
+      if (folder) {
+        allLabelIds.push(folder.toUpperCase());
+      }
+
+      const result = await findThreadsWithPagination(this.db, {
+        labelIds: allLabelIds,
+        searchText: q,
+        pageToken,
+        maxResults,
+        requireAllLabels: true, // Require all labels to be present
+      });
+
+      return result.threads.map((thread: any) => ({
+        id: thread.id,
+        latest_received_on: thread.latestReceivedOn,
+      }));
+    });
+  }
+
   async getThreadsFromDB(params: {
     labelIds?: string[];
     folder?: string;
@@ -679,173 +1227,47 @@ export class ZeroDriver extends AIChatAgent<typeof env> {
     maxResults?: number;
     pageToken?: string;
   }): Promise<IGetThreadsResponse> {
-    const { labelIds = [], q, maxResults = 50, pageToken } = params;
-    let folder = params.folder ?? 'inbox';
+    const { maxResults = 50 } = params;
+    const normalizedParams = {
+      ...params,
+      folder: params.folder ? this.normalizeFolderName(params.folder) : undefined,
+      maxResults,
+    };
 
-    try {
-      folder = this.normalizeFolderName(folder);
-      const folderThreadCount = (await this.count()).find((c) => c.label === folder)?.count;
-      const currentThreadCount = await this.getThreadCount();
+    const program = pipe(
+      this.queryThreads(normalizedParams),
+      Effect.map((result) => {
+        if (result?.length) {
+          const threads = result.map((row) => ({
+            id: String(row.id),
+            historyId: null,
+          }));
 
-      if (folderThreadCount && folderThreadCount > currentThreadCount && folder) {
-        this.ctx.waitUntil(this.syncThreads(folder));
-      }
+          // Use latest_received_on for pagination cursor
+          const nextPageToken =
+            threads.length === maxResults && result.length > 0
+              ? String(result[result.length - 1].latest_received_on)
+              : null;
 
-      // Build WHERE conditions
-      const whereConditions: string[] = [];
-
-      // Add folder condition (maps to specific label)
-      if (folder) {
-        const folderLabel = folder.toUpperCase();
-        whereConditions.push(`EXISTS (
-            SELECT 1 FROM json_each(latest_label_ids) WHERE value = '${folderLabel}'
-          )`);
-      }
-
-      // Add label conditions (OR logic for multiple labels)
-      if (labelIds.length > 0) {
-        if (labelIds.length === 1) {
-          whereConditions.push(`EXISTS (
-              SELECT 1 FROM json_each(latest_label_ids) WHERE value = '${labelIds[0]}'
-            )`);
-        } else {
-          // Multiple labels with OR logic
-          const multiLabelCondition = labelIds
-            .map(
-              (labelId) =>
-                `EXISTS (SELECT 1 FROM json_each(latest_label_ids) WHERE value = '${labelId}')`,
-            )
-            .join(' OR ');
-          whereConditions.push(`(${multiLabelCondition})`);
+          return {
+            threads,
+            nextPageToken,
+          };
         }
-      }
-
-      //   // Add search query condition
-      if (q) {
-        const searchTerm = q.replace(/'/g, "''"); // Escape single quotes
-        whereConditions.push(`(
-            latest_subject LIKE '%${searchTerm}%' OR
-            latest_sender LIKE '%${searchTerm}%'
-          )`);
-      }
-
-      // Add cursor condition
-      if (pageToken) {
-        whereConditions.push(`latest_received_on < '${pageToken}'`);
-      }
-
-      // Execute query based on conditions
-      let result;
-
-      if (whereConditions.length === 0) {
-        // No conditions
-        result = this.sql`
-            SELECT id, latest_received_on
-            FROM threads
-            ORDER BY latest_received_on DESC
-            LIMIT ${maxResults}
-          `;
-      } else if (whereConditions.length === 1) {
-        // Single condition
-        const condition = whereConditions[0];
-        if (condition.includes('latest_received_on <')) {
-          const cursorValue = pageToken!;
-          result = this.sql`
-              SELECT id, latest_received_on
-              FROM threads
-              WHERE latest_received_on < ${cursorValue}
-              ORDER BY latest_received_on DESC
-              LIMIT ${maxResults}
-            `;
-        } else if (folder) {
-          // Folder condition
-          const folderLabel = folder.toUpperCase();
-          result = this.sql`
-              SELECT id, latest_received_on
-              FROM threads
-              WHERE EXISTS (
-                SELECT 1 FROM json_each(latest_label_ids) WHERE value = ${folderLabel}
-              )
-              ORDER BY latest_received_on DESC
-              LIMIT ${maxResults}
-            `;
-        } else {
-          // Single label condition
-          const labelId = labelIds[0];
-          result = this.sql`
-              SELECT id, latest_received_on
-              FROM threads
-              WHERE EXISTS (
-                SELECT 1 FROM json_each(latest_label_ids) WHERE value = ${labelId}
-              )
-              ORDER BY latest_received_on DESC
-              LIMIT ${maxResults}
-            `;
-        }
-      } else {
-        // Multiple conditions - handle combinations
-        if (folder && labelIds.length === 0 && pageToken) {
-          // Folder + cursor
-          const folderLabel = folder.toUpperCase();
-          result = this.sql`
-              SELECT id, latest_received_on
-              FROM threads
-              WHERE EXISTS (
-                SELECT 1 FROM json_each(latest_label_ids) WHERE value = ${folderLabel}
-              ) AND latest_received_on < ${pageToken}
-              ORDER BY latest_received_on DESC
-              LIMIT ${maxResults}
-            `;
-        } else if (labelIds.length === 1 && pageToken && !folder) {
-          // Single label + cursor
-          const labelId = labelIds[0];
-          result = this.sql`
-              SELECT id, latest_received_on
-              FROM threads
-              WHERE EXISTS (
-                SELECT 1 FROM json_each(latest_label_ids) WHERE value = ${labelId}
-              ) AND latest_received_on < ${pageToken}
-              ORDER BY latest_received_on DESC
-              LIMIT ${maxResults}
-            `;
-        } else {
-          // For now, fallback to just cursor if complex combinations
-          const cursorValue = pageToken || '';
-          result = this.sql`
-              SELECT id, latest_received_on
-              FROM threads
-              WHERE latest_received_on < ${cursorValue}
-              ORDER BY latest_received_on DESC
-              LIMIT ${maxResults}
-            `;
-        }
-      }
-
-      if (result?.length) {
-        const threads = result.map((row) => ({
-          id: String(row.id),
-          historyId: null,
-        }));
-
-        // Use latest_received_on for pagination cursor
-        const nextPageToken =
-          threads.length === maxResults && result.length > 0
-            ? String(result[result.length - 1].latest_received_on)
-            : null;
-
         return {
-          threads,
-          nextPageToken,
+          threads: [],
+          nextPageToken: '',
         };
-      }
-      return {
-        threads: [],
-        nextPageToken: '',
-      };
-    } catch (error) {
-      console.error('Failed to get threads from database:', error);
-      throw error;
-    }
+      }),
+      Effect.catchAll((error) =>
+        Effect.sync(() => {
+          console.error('Failed to get threads from database:', error);
+          throw error;
+        }),
+      ),
+    );
+
+    return await Effect.runPromise(program);
   }
 
   async modifyThreadLabelsByName(
@@ -896,50 +1318,13 @@ export class ZeroDriver extends AIChatAgent<typeof env> {
 
   async modifyThreadLabelsInDB(threadId: string, addLabels: string[], removeLabels: string[]) {
     try {
-      // Get current labels
-      const result = this.sql`
-        SELECT latest_label_ids
-        FROM threads
-        WHERE id = ${threadId}
-        LIMIT 1
-      `;
+      const currentLabelsData = await getThreadLabels(this.db, threadId);
+      const currentLabels = currentLabelsData.map((l) => l.id);
 
-      if (!result || result.length === 0) {
-        throw new Error(`Thread ${threadId} not found in database`);
-      }
+      const result = await modifyThreadLabels(this.db, threadId, addLabels, removeLabels);
 
-      let currentLabels: string[];
-      try {
-        currentLabels = JSON.parse(result[0].latest_label_ids || '[]') as string[];
-      } catch (error) {
-        console.error(`Invalid JSON in latest_label_ids for thread ${threadId}:`, error);
-        currentLabels = [];
-      }
-
-      // Apply label modifications
-      let updatedLabels = [...currentLabels];
-
-      // Remove labels
-      if (removeLabels.length > 0) {
-        updatedLabels = updatedLabels.filter((label) => !removeLabels.includes(label));
-      }
-
-      // Add labels (avoid duplicates)
-      if (addLabels.length > 0) {
-        for (const label of addLabels) {
-          if (!updatedLabels.includes(label)) {
-            updatedLabels.push(label);
-          }
-        }
-      }
-
-      // Update the database
-      void this.sql`
-        UPDATE threads
-        SET latest_label_ids = ${JSON.stringify(updatedLabels)},
-            updated_at = CURRENT_TIMESTAMP
-        WHERE id = ${threadId}
-      `;
+      const allAffectedLabels = [...new Set([...addLabels, ...removeLabels])];
+      await Promise.all(allAffectedLabels.map((label) => this.reloadFolder(label.toLowerCase())));
 
       await this.agent?.broadcastChatMessage({
         type: OutgoingMessageType.Mail_Get,
@@ -950,7 +1335,8 @@ export class ZeroDriver extends AIChatAgent<typeof env> {
         success: true,
         threadId,
         previousLabels: currentLabels,
-        updatedLabels,
+        addedLabels: result.addedLabels,
+        removedLabels: result.removedLabels,
       };
     } catch (error) {
       console.error('Failed to modify thread labels in database:', error);
@@ -958,26 +1344,11 @@ export class ZeroDriver extends AIChatAgent<typeof env> {
     }
   }
 
-  async getThreadFromDB(id: string): Promise<IGetThreadResponse> {
+  async getThreadFromDB(id: string, includeDrafts: boolean = false): Promise<IGetThreadResponse> {
     try {
-      const result = this.sql`
-          SELECT
-            id,
-            thread_id,
-            provider_id,
-            latest_sender,
-            latest_received_on,
-            latest_subject,
-            latest_label_ids,
-            created_at,
-            updated_at
-          FROM threads
-          WHERE id = ${id}
-          LIMIT 1
-        `;
-
-      if (!result || result.length === 0) {
-        await this.queue('syncThread', { threadId: id });
+      const result = await get(this.db, { id });
+      if (!result) {
+        await this.syncThread({ threadId: id });
         return {
           messages: [],
           latest: undefined,
@@ -986,21 +1357,28 @@ export class ZeroDriver extends AIChatAgent<typeof env> {
           labels: [],
         } satisfies IGetThreadResponse;
       }
-      const row = result[0] as { latest_label_ids: string };
-      const storedThread = await env.THREADS_BUCKET.get(this.getThreadKey(id));
+      const storedThread = await this.env.THREADS_BUCKET.get(this.getThreadKey(id));
 
-      const messages: ParsedMessage[] = storedThread
+      let messages: ParsedMessage[] = storedThread
         ? (JSON.parse(await storedThread.text()) as IGetThreadResponse).messages
         : [];
 
-      const latestLabelIds = JSON.parse(row.latest_label_ids || '[]');
+      const isLatestDraft = messages.some((e) => e.isDraft === true);
+
+      if (!includeDrafts) {
+        messages = messages.filter((e) => e.isDraft !== true);
+      }
+
+      const labelsList = await getThreadLabels(this.db, id);
+      const labelIds = labelsList.map((l) => l.id);
 
       return {
         messages,
         latest: messages.findLast((e) => e.isDraft !== true),
-        hasUnread: latestLabelIds.includes('UNREAD'),
+        hasUnread: labelIds.includes('UNREAD'),
         totalReplies: messages.filter((e) => e.isDraft !== true).length,
-        labels: latestLabelIds.map((id: string) => ({ id, name: id })),
+        labels: labelsList,
+        isLatestDraft,
       } satisfies IGetThreadResponse;
     } catch (error) {
       console.error('Failed to get thread from database:', error);
@@ -1020,7 +1398,7 @@ export class ZeroDriver extends AIChatAgent<typeof env> {
       }
 
       if (keyNames.length) {
-        await Promise.all(keyNames.map((k: string) => env.snoozed_emails.delete(k)));
+        await Promise.all(keyNames.map((k: string) => this.env.snoozed_emails.delete(k)));
       }
     } catch (error) {
       console.error('[AGENT][unsnoozeThreadsHandler] Failed', { connectionId, threadIds, error });
@@ -1054,50 +1432,125 @@ export class ZeroDriver extends AIChatAgent<typeof env> {
     return await this.getThreadsFromDB(params);
   }
 
-  async get(id: string) {
-    if (!this.driver) {
-      throw new Error('No driver available');
+  //   async get(id: string, includeDrafts: boolean = false) {
+  //     if (!this.driver) {
+  //       throw new Error('No driver available');
+  //     }
+  //     return await this.getThreadFromDB(id, includeDrafts);
+  //   }
+
+  public async storeThreadInDB(
+    threadData: {
+      id: string;
+      threadId: string;
+      providerId: string;
+      latestSender: any;
+      latestReceivedOn: string;
+      latestSubject: string;
+    },
+    labelIds: string[],
+  ): Promise<void> {
+    try {
+      await create(
+        this.db,
+        {
+          id: threadData.id,
+          threadId: threadData.threadId,
+          providerId: threadData.providerId,
+          latestSender: threadData.latestSender,
+          latestReceivedOn: threadData.latestReceivedOn,
+          latestSubject: threadData.latestSubject,
+        },
+        labelIds,
+      );
+      //   await sendDoState(this.name);
+      console.log(`[ZeroDriver] Successfully stored thread ${threadData.id} in database`);
+    } catch (error) {
+      console.error(`[ZeroDriver] Failed to store thread ${threadData.id} in database:`, error);
+      throw error;
     }
-    return await this.getThreadFromDB(id);
+  }
+
+  private async triggerSyncWorkflow(folder: string): Promise<void> {
+    try {
+      console.log(`[ZeroDriver] Triggering sync coordinator workflow for ${this.name}/${folder}`);
+
+      const instance = await this.env.SYNC_THREADS_COORDINATOR_WORKFLOW.create({
+        params: {
+          connectionId: this.name,
+          folder: folder,
+        },
+      });
+
+      console.log(
+        `[ZeroDriver] Sync coordinator workflow triggered for ${this.name}/${folder}, instance: ${instance.id}`,
+      );
+    } catch (error) {
+      console.error(
+        `[ZeroDriver] Failed to trigger sync coordinator workflow for ${this.name}/${folder}:`,
+        error,
+      );
+      //   try {
+      //     const fallbackInstance = await this.env.SYNC_THREADS_WORKFLOW.create({
+      //       id: `${this.name}-${folder}`,
+      //       params: {
+      //         connectionId: this.name,
+      //         folder: folder,
+      //       },
+      //     });
+      //     console.log(`[ZeroDriver] Fallback to original workflow: ${fallbackInstance.id}`);
+      //   } catch (fallbackError) {
+      //     console.error(`[ZeroDriver] Fallback workflow also failed:`, fallbackError);
+      //   }
+    }
   }
 }
 
-export class ZeroAgent extends AIChatAgent<typeof env> {
+export class ZeroAgent extends AIChatAgent<ZeroEnv> {
   private chatMessageAbortControllers: Map<string, AbortController> = new Map();
 
   async registerZeroMCP() {
-    await this.mcp.connect(env.VITE_PUBLIC_BACKEND_URL + '/sse', {
+    await this.mcp.connect(this.env.VITE_PUBLIC_BACKEND_URL + '/sse', {
       transport: {
         authProvider: new DurableObjectOAuthClientProvider(
           this.ctx.storage,
           'zero-mcp',
-          env.VITE_PUBLIC_BACKEND_URL,
+          this.env.VITE_PUBLIC_BACKEND_URL,
         ),
       },
     });
   }
 
   async registerThinkingMCP() {
-    await this.mcp.connect(env.VITE_PUBLIC_BACKEND_URL + '/mcp/thinking/sse', {
+    await this.mcp.connect(this.env.VITE_PUBLIC_BACKEND_URL + '/mcp/thinking/sse', {
       transport: {
         authProvider: new DurableObjectOAuthClientProvider(
           this.ctx.storage,
           'thinking-mcp',
-          env.VITE_PUBLIC_BACKEND_URL,
+          this.env.VITE_PUBLIC_BACKEND_URL,
         ),
       },
     });
   }
 
-  onStart(): void | Promise<void> {
+  onStart() {
     this.registerThinkingMCP();
+  }
+
+  async onConnect(connection: Connection): Promise<void> {
+    connection.send(
+      JSON.stringify({
+        type: OutgoingMessageType.Mail_List,
+        folder: 'inbox',
+      }),
+    );
   }
 
   private getDataStreamResponse(
     onFinish: StreamTextOnFinishCallback<{}>,
-    _?: {
-      abortSignal: AbortSignal | undefined;
-    },
+    currentThreadId: string,
+    currentFolder: string,
+    currentFilter: string,
   ) {
     const dataStreamResponse = createDataStreamResponse({
       execute: async (dataStream) => {
@@ -1123,9 +1576,9 @@ export class ZeroAgent extends AIChatAgent<typeof env> {
         );
 
         const model =
-          env.USE_OPENAI === 'true'
-            ? openai(env.OPENAI_MODEL || 'gpt-4o')
-            : anthropic(env.OPENAI_MODEL || 'claude-3-7-sonnet-20250219');
+          this.env.USE_OPENAI === 'true'
+            ? groq('openai/gpt-oss-120b')
+            : anthropic(this.env.OPENAI_MODEL || 'claude-3-7-sonnet-20250219');
 
         const result = streamText({
           model,
@@ -1136,7 +1589,11 @@ export class ZeroAgent extends AIChatAgent<typeof env> {
           onError: (error) => {
             console.error('Error in streamText', error);
           },
-          system: await getPrompt(getPromptName(connectionId, EPrompts.Chat), AiChatPrompt('')),
+          system: await getPrompt(getPromptName(connectionId, EPrompts.Chat), AiChatPrompt(), {
+            currentThreadId,
+            currentFolder,
+            currentFilter,
+          }),
         });
 
         result.mergeIntoDataStream(dataStream);
@@ -1202,7 +1659,14 @@ export class ZeroAgent extends AIChatAgent<typeof env> {
 
           const { body } = data.init;
 
-          const { messages } = JSON.parse(body as string);
+          const { messages, threadId, currentFolder, currentFilter } = JSON.parse(
+            body as string,
+          ) as {
+            threadId: string;
+            currentFolder: string;
+            currentFilter: string;
+            messages: Message[];
+          };
           this.broadcastChatMessage(
             {
               type: OutgoingMessageType.ChatMessages,
@@ -1213,10 +1677,10 @@ export class ZeroAgent extends AIChatAgent<typeof env> {
           await this.persistMessages(messages, [connection.id]);
 
           const chatMessageId = data.id;
-          const abortSignal = this.getAbortSignal(chatMessageId);
+          //   const abortSignal = this.getAbortSignal(chatMessageId);
 
           return this.tryCatchChat(async () => {
-            const response = await this.onChatMessage(
+            const response = await this.onChatMessageWithContext(
               async ({ response }) => {
                 const finalMessages = appendResponseMessages({
                   messages,
@@ -1226,7 +1690,9 @@ export class ZeroAgent extends AIChatAgent<typeof env> {
                 await this.persistMessages(finalMessages, [connection.id]);
                 this.removeAbortController(chatMessageId);
               },
-              abortSignal ? { abortSignal } : undefined,
+              threadId,
+              currentFolder,
+              currentFilter,
             );
 
             if (response) {
@@ -1329,12 +1795,12 @@ export class ZeroAgent extends AIChatAgent<typeof env> {
     this.chatMessageAbortControllers.clear();
   }
 
-  async onChatMessage(
+  async onChatMessageWithContext(
     onFinish: StreamTextOnFinishCallback<{}>,
-    options?: {
-      abortSignal: AbortSignal | undefined;
-    },
+    currentThreadId: string,
+    currentFolder: string,
+    currentFilter: string,
   ) {
-    return this.getDataStreamResponse(onFinish, options);
+    return this.getDataStreamResponse(onFinish, currentThreadId, currentFolder, currentFilter);
   }
 }

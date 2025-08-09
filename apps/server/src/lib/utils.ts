@@ -1,5 +1,6 @@
 import type { AppContext, EProviders, Sender } from '../types';
-import { env } from 'cloudflare:workers';
+import type { Customer } from 'autumn-js';
+import { env } from '../env';
 
 export const parseHeaders = (token: string) => {
   const headers = new Headers();
@@ -23,7 +24,9 @@ export const c = {
 } as unknown as AppContext;
 
 export const getNotificationsUrl = (provider: EProviders) => {
-  return env.VITE_PUBLIC_BACKEND_URL + '/a8n/notify/' + provider;
+  return env.DEV_PROXY
+    ? `${env.DEV_PROXY}/a8n/notify/${provider}`
+    : env.VITE_PUBLIC_BACKEND_URL + '/a8n/notify/' + provider;
 };
 
 export async function setSubscribedState(
@@ -96,12 +99,6 @@ export const truncateFileName = (name: string, maxLength = 15) => {
     return `${name.slice(0, maxLength - 5)}...${name.slice(extIndex)}`;
   }
   return `${name.slice(0, maxLength)}...`;
-};
-
-export type FilterSuggestion = {
-  filter: string;
-  description: string;
-  prefix: string;
 };
 
 export const extractFilterValue = (filter: string): string => {
@@ -368,4 +365,14 @@ export const cleanSearchValue = (q: string): string => {
     .replace(new RegExp(escapedValues.join('|'), 'g'), '')
     .replace(/\s+/g, ' ')
     .trim();
+};
+
+const PRO_PLANS = ['pro-example', 'pro_annual', 'team', 'enterprise'] as const;
+
+export const isProCustomer = (customer: Customer) => {
+  return customer?.products && Array.isArray(customer.products)
+    ? customer.products.some((product) =>
+        PRO_PLANS.some((plan) => product.id?.includes(plan) || product.name?.includes(plan)),
+      )
+    : false;
 };

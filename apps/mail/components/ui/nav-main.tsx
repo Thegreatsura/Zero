@@ -19,7 +19,6 @@ import { useStats } from '@/hooks/use-stats';
 import SidebarLabels from './sidebar-labels';
 import { useCallback, useRef } from 'react';
 import { BASE_URL } from '@/lib/constants';
-import { useQueryState } from 'nuqs';
 import { Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -55,7 +54,6 @@ export function NavMain({ items }: NavMainProps) {
   const location = useLocation();
   const pathname = location.pathname;
   const searchParams = new URLSearchParams();
-  const [category] = useQueryState('category');
 
   const trpc = useTRPC();
   const { data: intercomToken } = useQuery(trpc.user.getIntercomToken.queryOptions());
@@ -108,9 +106,7 @@ export function NavMain({ items }: NavMainProps) {
       // Handle settings navigation
       if (item.isSettingsButton) {
         // Include current path with category query parameter if present
-        const currentPath = category
-          ? `${pathname}?category=${encodeURIComponent(category)}`
-          : pathname;
+        const currentPath = pathname;
         return `${item.url}?from=${encodeURIComponent(currentPath)}`;
       }
 
@@ -137,14 +133,9 @@ export function NavMain({ items }: NavMainProps) {
         return `${item.url}?from=/mail`;
       }
 
-      // Handle category links
-      if (item.id === 'inbox' && category) {
-        return `${item.url}?category=${encodeURIComponent(category)}`;
-      }
-
       return item.url;
     },
-    [pathname, category, searchParams, isValidInternalUrl],
+    [pathname, searchParams, isValidInternalUrl],
   );
 
   const { data: activeAccount } = useActiveConnection();
@@ -176,6 +167,9 @@ export function NavMain({ items }: NavMainProps) {
       loading: 'Creating label...',
       success: 'Label created successfully',
       error: 'Failed to create label',
+      finally: () => {
+        refetch();
+      },
     });
   };
 
@@ -253,7 +247,6 @@ export function NavMain({ items }: NavMainProps) {
                       </Button>
                     }
                     onSubmit={onSubmit}
-                    onSuccess={refetch}
                   />
                 ) : activeAccount?.providerId === 'microsoft' ? null : null}
               </div>
@@ -281,7 +274,7 @@ function NavItem(item: NavItemProps & { href: string }) {
         className="flex cursor-not-allowed items-center opacity-50"
       >
         {item.icon && <item.icon ref={iconRef} className="relative mr-2.5 h-3 w-3.5" />}
-        <p className="relative bottom-[1px] mt-0.5 truncate text-[13px]">{item.title}</p>
+        <p className="relative bottom-px mt-0.5 truncate text-[13px]">{item.title}</p>
       </SidebarMenuButton>
     );
   }
@@ -308,7 +301,7 @@ function NavItem(item: NavItemProps & { href: string }) {
         >
           <Link target={item.target} to={item.href}>
             {item.icon && <item.icon ref={iconRef} className="mr-2 shrink-0" />}
-            <p className="relative bottom-[1px] mt-0.5 min-w-0 flex-1 truncate text-[13px]">
+            <p className="relative bottom-px mt-0.5 min-w-0 flex-1 truncate text-[13px]">
               {item.title}
             </p>
             {stats &&
